@@ -675,9 +675,9 @@ footer{border-top:1px solid var(--border);padding-top:18px;display:flex;justify-
 // ══════════════════════════════════════════════════════════
 const CONFIG = {
   FRED_API_KEY: 'b0a6e25d3c3e7ce883de9c27dfbbb5e4',
-  // ─── GNEWS ────────────────────────────────────────────
-  // gnews.io — browser CORS-friendly, 100 req/day free
-  GNEWS_API_KEY: 'd5be65b0dcb1c46d9471ec1b3cff6e61',
+  // ─── NEWSDATA.IO ───────────────────────────────────────
+  // newsdata.io — browser CORS-friendly, 200 credits/day free
+  GNEWS_API_KEY: 'pub_a4d8ad80e99942699c927c202edc01e3',
   // Finnhub — free at finnhub.io, 60 req/min, no CORS issues
   FINNHUB_API_KEY: 'd6flif9r01qqnmbp57cgd6flif9r01qqnmbp57d0',
   // Alpha Vantage — free 25 req/day, 20yr history, get key at alphavantage.co
@@ -1762,8 +1762,8 @@ ${storyList}`;
 const NEWS_USE_LIVE = !!CONFIG.GNEWS_API_KEY;
 
 // GNews search queries per tab
-// GNews API: https://gnews.io/api/v4/search?q=...&lang=en&max=9&apikey=KEY
-// Native browser CORS — no proxy needed, 100 req/day free
+// NewsData.io API: https://newsdata.io/api/1/news?apikey=KEY&q=QUERY&language=en
+// Native browser CORS — no proxy needed, 200 credits/day free
 const NEWS_QUERIES = {
   all:         'federal reserve OR BRICS OR trade war OR AI OR OPEC OR debt ceiling OR treasury yields',
   fed:         'federal reserve OR FOMC OR interest rates OR Jerome Powell OR treasury yields',
@@ -1825,19 +1825,19 @@ async function fetchLiveNews(tab) {
 
   // Check daily budget before making the request
   if (!gnewsCanFetch()) {
-    console.warn(`GNews budget exhausted (${gnewsBudget().used}/${GNEWS_DAILY_BUDGET} used). Using cache.`);
+    console.warn(`NewsData budget exhausted (${gnewsBudget().used}/${GNEWS_DAILY_BUDGET} used). Using cache.`);
     return newsCache[tab] || null;
   }
 
   const q   = encodeURIComponent(NEWS_QUERIES[tab] || NEWS_QUERIES.all);
-  const url = `https://gnews.io/api/v4/search?q=${q}&lang=en&max=9&sortby=publishedAt&apikey=${CONFIG.GNEWS_API_KEY}`;
+  const url = `https://newsdata.io/api/1/news?apikey=${CONFIG.GNEWS_API_KEY}&q=${q}&language=en&size=9`;
 
   try {
     gnewsSpend(); gnewsBudgetWarning();
     const r = await fetch(url);
     if (!r.ok) return null;
     const d = await r.json();
-    if (!d.articles?.length) return null;
+    if (!d.results?.length) return null;
 
     const CAT_LABELS = {
       all:'Macro Intel', fed:'Fed & Rates', geo:'Geopolitics', ai:'AI & Tech',
@@ -1848,20 +1848,20 @@ async function fetchLiveNews(tab) {
       brics:'#d29922', commodities:'#e3894b', credit:'#f85149'
     };
 
-    const stories = d.articles.map((a, i) => ({
+    const stories = d.results.map((a, i) => ({
       id:         'live_' + tab + '_' + i,
       cat:        tab,
       catLabel:   CAT_LABELS[tab] || 'Macro Intel',
       color:      CAT_COLORS[tab] || '#58a6ff',
       headline:   a.title?.replace(/ - .*$/, '').replace(/ \| .*$/, '') || 'Breaking',
-      body:       a.description || 'Click to read the full story.',
+      body:       a.description || a.content?.slice(0, 200) || 'Click to read the full story.',
       impact:     'watch',
       impactLabel:'LIVE',
-      time:       a.publishedAt
-                    ? new Date(a.publishedAt).toLocaleDateString('en-US', { month:'short', day:'numeric' })
+      time:       a.pubDate
+                    ? new Date(a.pubDate).toLocaleDateString('en-US', { month:'short', day:'numeric' })
                     : 'Today',
-      url:        a.url,
-      source:     a.source?.name || '',
+      url:        a.link,
+      source:     a.source_id || '',
     }));
 
     newsCache[tab] = stories;
@@ -2342,12 +2342,19 @@ async function loadBreakingNews(forceRefresh = false) {
   try {
     gnewsSpend();
     const q   = encodeURIComponent(BREAKING_QUERY);
-    const url = `https://gnews.io/api/v4/search?q=${q}&lang=en&max=10&sortby=publishedAt&apikey=${CONFIG.GNEWS_API_KEY}`;
+    const url = `https://newsdata.io/api/1/news?apikey=${CONFIG.GNEWS_API_KEY}&q=${q}&language=en&size=10`;
     const r   = await fetch(url);
-    if (!r.ok) throw new Error('GNews error');
+    if (!r.ok) throw new Error('NewsData error');
     const d   = await r.json();
-    if (!d.articles?.length) throw new Error('No articles');
-    breakingRenderTrack(d.articles);
+    if (!d.results?.length) throw new Error('No articles');
+    // Map NewsData format to our expected format
+    const articles = d.results.map(a => ({
+      title:       a.title,
+      publishedAt: a.pubDate,
+      source:      { name: a.source_id || '' },
+      url:         a.link,
+    }));
+    breakingRenderTrack(articles);
   } catch {
     // Fallback: use already-loaded news stories from the main news section
     if (breakingStories.length && !forceRefresh) return;
