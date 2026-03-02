@@ -1732,6 +1732,9 @@ classifyNewsImpact(stories);
   } else {
 enrichNewsWithAI();
   }
+
+  // Update the scrolling ticker with these headlines
+  updateScrollingTicker(stories);
 }
 
 async function enrichNewsWithAI() {
@@ -1836,24 +1839,14 @@ return newsCache[tab] || null;
 
   const q   = encodeURIComponent(NEWS_QUERIES[tab] || NEWS_QUERIES.all);
   // Only pull stories from last 7 days
-  const fromDate = new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0];
-  // Reputable macro/finance sources only
-  const GOOD_DOMAINS = 'reuters.com,bloomberg.com,ft.com,wsj.com,cnbc.com,marketwatch.com,economist.com,financialtimes.com,apnews.com,bbc.co.uk,foxbusiness.com,forbes.com,businessinsider.com,seekingalpha.com,zerohedge.com,investing.com,thestreet.com,barrons.com,morningstar.com';
-  const url = `https://newsdata.io/api/1/news?apikey=${CONFIG.GNEWS_API_KEY}&q=${q}&language=en&size=9&from_date=${fromDate}&domainurl=${encodeURIComponent(GOOD_DOMAINS)}`;
+  const url = `https://newsdata.io/api/1/news?apikey=${CONFIG.GNEWS_API_KEY}&q=${q}&language=en&size=9`;
 
   try {
     gnewsSpend(); gnewsBudgetWarning();
     let r = await fetch(url);
     if (!r.ok) return null;
     let d = await r.json();
-    // If domain filter returns nothing, retry with just date filter
-    if (!d.results?.length) {
-      const fallbackUrl = `https://newsdata.io/api/1/news?apikey=${CONFIG.GNEWS_API_KEY}&q=${q}&language=en&size=9&from_date=${fromDate}`;
-      gnewsSpend();
-      r = await fetch(fallbackUrl);
-      if (!r.ok) return null;
-      d = await r.json();
-    }
+
     if (!d.results?.length) return null;
 
     const CAT_LABELS = {
@@ -1913,7 +1906,12 @@ if (el) {
 el.className = 'news-card-impact ' + (impactClass[impact] || 'impact-watch');
 el.textContent = label || 'WATCH';
 }
+// Update story object so ticker reflects classification
+const story = stories.find(s => s.id === id);
+if (story) story.impact = impact || 'watch';
 });
+// Refresh scrolling ticker with classified impact colors
+updateScrollingTicker(stories);
   } catch {}
 }
 
@@ -2322,6 +2320,8 @@ activeAssets.add(key); el.classList.remove('off');
 window.addEventListener('resize', ()=>{ syncOverlay(); redrawOverlay(); });
 
 // Initialize news on load
+let breakingPaused = false;
+let breakingStories = [];
 renderNews();
 setTimeout(enrichNewsWithAI, 3000); // Wait for dashboard data to load first
 
@@ -2350,9 +2350,6 @@ const BREAKING_QUERY = [
   'China economy','Japan yen','ECB rate',
   'war ceasefire','geopolitical risk',
 ].join(' OR ');
-
-let breakingPaused = false;
-let breakingStories = [];
 
 function breakingTogglePause() {
   breakingPaused = !breakingPaused;
@@ -2402,6 +2399,9 @@ if (breakingPaused) track.style.animationPlayState = 'paused';
   const hasBreaking = stories.some(s => (Date.now() - new Date(s.publishedAt).getTime()) < 120*60000);
   const label = document.querySelector('.breaking-label');
   if (label) label.style.background = hasBreaking ? 'var(--red)' : 'var(--accent)';
+
+  // Also update the scrolling news ticker with these breaking headlines
+  updateScrollingTicker();
 }
 
 async function loadBreakingNews(forceRefresh = false) {
@@ -2444,6 +2444,92 @@ breakingRenderTrack(fallback);
 setTimeout(loadBreakingNews, 500);
 setInterval(loadBreakingNews, 60 * 60 * 1000);
 
+// ─────────────────────────────────────────────────────────
+// LIVE SCROLLING TICKER — breaking headlines, sorted newest-first
+// Sources (in priority order):
+//   1. breakingStories (from loadBreakingNews — high-urgency macro keywords)
+//   2. Live news card stories (from fetchLiveNews / renderNews)
+//   3. Static NEWS_STORIES fallback
+// ─────────────────────────────────────────────────────────
+function updateScrollingTicker(storiesOverride) {
+  const el = document.getElementById('newsTicker');
+  if (!el) return;
+
+  // Priority: breaking stories first, then whatever was passed in, then static
+  let pool = [];
+
+  // 1. Breaking stories (highest priority — already filtered for urgency keywords)
+  if (breakingStories && breakingStories.length) {
+    pool = breakingStories.map(s => ({
+      headline: (s.title || '').replace(/ - .*$/, '').replace(/ \| .*$/, ''),
+      source:   s.source?.name || '',
+      time:     s.publishedAt ? new Date(s.publishedAt).getTime() : 0,
+      impact:   null, // classified later if available
+    }));
+  }
+
+  // 2. Merge in news card stories (may have AI-classified impact)
+  if (storiesOverride && storiesOverride.length) {
+    const existing = new Set(pool.map(p => p.headline.toLowerCase().slice(0, 50)));
+    storiesOverride.forEach(s => {
+      const hl = (s.headline || s.title || '').replace(/ - .*$/, '').replace(/ \| .*$/, '');
+      if (!hl || existing.has(hl.toLowerCase().slice(0, 50))) return; // dedupe
+      pool.push({
+        headline: hl,
+        source:   s.source?.name || s.catLabel || s.cat || '',
+        time:     s.publishedAt ? new Date(s.publishedAt).getTime()
+                : s.pubDate    ? new Date(s.pubDate).getTime()
+                : 0,
+        impact:   s.impact || null,
+      });
+    });
+  }
+
+  // 3. Static fallback
+  if (!pool.length) {
+    NEWS_STORIES.forEach(s => {
+      pool.push({
+        headline: s.headline,
+        source:   s.catLabel || '',
+        time:     0,
+        impact:   s.impact || 'neutral',
+      });
+    });
+  }
+
+  if (!pool.length) return;
+
+  // Sort newest first
+  pool.sort((a, b) => b.time - a.time);
+
+  // Build ticker items
+  const impactToCls = { bull:'bull', bear:'bear', neutral:'neutral', watch:'neutral' };
+
+  const items = pool.map(s => {
+    if (!s.headline) return null;
+    const cls = impactToCls[s.impact] || 'neutral';
+
+    // Age tag for breaking stories
+    let ageTag = '';
+    if (s.time > 0) {
+      const ageMin = (Date.now() - s.time) / 60000;
+      if (ageMin < 120) ageTag = '<span style="color:var(--red);font-weight:700;margin-right:4px;">⚡ BREAKING</span>';
+      else if (ageMin < 360) ageTag = `<span style="color:var(--yellow);margin-right:4px;">${Math.floor(ageMin/60)}H AGO</span>`;
+    }
+
+    const src = s.source ? `<span style="color:var(--text-dim);margin-left:6px;font-size:9px;">— ${s.source}</span>` : '';
+    return `<div class="news-ticker-item ${cls}">${ageTag}<span>${s.headline}</span>${src}</div>`;
+  }).filter(Boolean);
+
+  if (!items.length) return;
+  // Double for seamless scroll loop
+  el.innerHTML = [...items, ...items].join('');
+
+  // Adjust speed — more items = longer animation
+  const duration = Math.max(40, Math.min(120, items.length * 6));
+  el.style.animationDuration = duration + 's';
+}
+
 async function refreshAll() {
   document.getElementById('lastUpdated').innerHTML = '<span class="live-dot"></span>Loading...';
 
@@ -2463,6 +2549,11 @@ loadScorecard({ markets, growth, inflation, liquidity, risk }),
 
   // Init chart after data loads
   initChart();
+
+  // Update the scrolling ticker with latest headlines
+  // Passes news card stories as override to merge with breaking stories
+  const tickerStories = newsCache[activeTab] || NEWS_STORIES;
+  updateScrollingTicker(tickerStories);
 
   // Note: news does NOT auto-refresh here — it uses its own 60-min TTL
   // This prevents burning GNews quota on every 5-min market data refresh
