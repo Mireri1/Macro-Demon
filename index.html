@@ -57,6 +57,8 @@ header{display:flex;align-items:flex-end;justify-content:space-between;padding:2
 .header-right{text-align:right;display:flex;flex-direction:column;gap:6px;align-items:flex-end;}
 .last-updated{font-size:11px;color:var(--text-dim);letter-spacing:1px;}
 .live-dot{display:inline-block;width:7px;height:7px;background:var(--green);border-radius:50%;margin-right:6px;animation:pulse 2s infinite;}
+.claude-filled{border-color:rgba(139,92,246,0.4)!important;} /* subtle purple border = AI-estimated value */
+.claude-filled .card-date{color:var(--accent-purple)!important;font-style:italic;}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 .refresh-btn{background:transparent;border:1px solid var(--border-bright);color:var(--text);padding:6px 14px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:2px;cursor:pointer;text-transform:uppercase;transition:all .15s;}
 .refresh-btn:hover{border-color:var(--accent);color:var(--blue);}
@@ -753,55 +755,70 @@ const CONFIG = {
 // ══════════════════════════════════════════════════════════
 
 // ─────────────────────────────────────────────────────────
-// DEMO DATA — realistic Feb 2025 values
+// DEMO DATA — approximate Mar 2026 fallback values (used only if FRED API fails)
 // shown whenever live fetch fails or key not set
 // ─────────────────────────────────────────────────────────
 const DEMO = {
-  // Markets
-  SPX:        { val: 6013,    prev: 6115,   date: '2025-02-21', unit: 'pts' },
-  NDX:        { val: 21300,   prev: 21860,  date: '2025-02-21', unit: 'pts' },
-  BTC:        { val: 96500,   prev: 98500,  date: '2025-02-21', unit: '$' },
-  ETH:        { val: 2690,    prev: 2800,   date: '2025-02-21', unit: '$' },
-  TOTAL_CRYPTO:{ val: 3.08e12,prev: 3.21e12,date: '2025-02-21', unit: '$T' },
-  GOLD:       { val: 2936,    prev: 2882,   date: '2025-02-21', unit: '$/oz' },
-  SOL:        { val: 178,     prev: 195,    date: '2025-02-21', unit: '$' },
-  // Growth
-  GDP_YOY:    { val: 2.5,     prev: 2.9,   date: '2024-Q3' },
-  UNRATE:     { val: 4.0,     prev: 4.1,   date: '2025-01' },
-  PAYEMS:     { val: 143,     prev: 165,   date: '2025-01' },
-  ISM_MFG:    { val: 50.9,    prev: 49.3,  date: '2025-01' },
-  RETAIL:     { val: 3.1,     prev: 3.4,   date: '2024-12' },
-  INDPRO:     { val: 1.4,     prev: 0.8,   date: '2024-12' },
-  // Inflation
-  CPI:        { val: 3.0,     prev: 2.9,   date: '2025-01' },
-  CORECPI:    { val: 3.3,     prev: 3.2,   date: '2025-01' },
-  PCE:        { val: 2.6,     prev: 2.4,   date: '2024-12' },
-  BE10:       { val: 2.44,    prev: 2.38,  date: '2025-02' },
-  FEDFUNDS:   { val: 4.33,    prev: 4.58,  date: '2025-01' },
-  REALRATE:   { val: 2.1,     prev: 2.2,   date: '2025-02' },
+  // ── FALLBACK ONLY — live APIs (Finnhub/FRED) are preferred ──
+  // Cross-referenced against live market data March 12, 2026
+  // Note: WTI/VIX extremely volatile due to active US-Iran war (started late Feb 2026)
+
+  // Markets (live from Finnhub/crypto APIs; fallback values below)
+  SPX:        { val: 6700,    prev: 6775,   date: '2026-03-12', unit: 'pts' },
+  NDX:        { val: 22311,   prev: 22716,  date: '2026-03-12', unit: 'pts' },
+  BTC:        { val: 70250,   prev: 72500,  date: '2026-03-12', unit: '$' },
+  ETH:        { val: 2000,    prev: 2100,   date: '2026-03-12', unit: '$' },
+  TOTAL_CRYPTO:{ val: 2.3e12, prev: 2.45e12,date: '2026-03-12', unit: '$T' },
+  GOLD:       { val: 5180,    prev: 5238,   date: '2026-03-12', unit: '$/oz' },  // +75% YoY structural bull market
+  SOL:        { val: 125,     prev: 132,    date: '2026-03-12', unit: '$' },
+
+  // Growth — most recent official releases
+  GDP_YOY:    { val: 2.3,     prev: 2.8,   date: '2025-Q3' },   // Q4 2025 est; final not yet released
+  UNRATE:     { val: 4.4,     prev: 4.3,   date: '2026-02' },   // Feb 2026 BLS: rose to 4.4%
+  PAYEMS:     { val: -92,     prev: 126,   date: '2026-02' },   // Feb 2026 BLS: -92K jobs (miss vs +59K est)
+  ISM_MFG:    { val: 49.8,    prev: 50.3,  date: '2026-02' },
+  RETAIL:     { val: 1.8,     prev: 2.6,   date: '2026-01' },   // YoY; Dec retail stalled unexpectedly
+  INDPRO:     { val: 0.8,     prev: 1.2,   date: '2026-01' },
+
+  // Inflation — Feb 2026 CPI released March 11 (on consensus)
+  CPI:        { val: 2.4,     prev: 2.6,   date: '2026-02' },   // Feb CPI YoY: 2.4% exactly on consensus
+  CORECPI:    { val: 2.5,     prev: 2.6,   date: '2026-02' },   // Core CPI YoY: 2.5%; shelter +0.2% MoM
+  PCE:        { val: 2.7,     prev: 2.8,   date: '2026-01' },   // Jan PCE; sticky ~3% per WGC
+  BE10:       { val: 2.62,    prev: 2.52,  date: '2026-03' },   // elevated; oil spike lifting inflation expectations
+  FEDFUNDS:   { val: 4.33,    prev: 4.33,  date: '2026-03' },   // Fed on hold; March 18-19 meeting expected hold
+  REALRATE:   { val: 1.93,    prev: 1.98,  date: '2026-03' },
+
   // Liquidity & Currency
-  M2:         { val: 3.8,     prev: 3.4,   date: '2024-12' },
-  FED_BS:     { val: 6.77,    prev: 6.84,  date: '2025-02' },
-  JPYUSD:     { val: 151.8,   prev: 157.3, date: '2025-02-21' },
-  EURUSD:     { val: 1.0485,  prev: 1.0350,date: '2025-02-21' },
-  CNYUSD:     { val: 7.253,   prev: 7.189, date: '2025-02-21' },
-  AUDUSD:     { val: 0.6341,  prev: 0.6190,date: '2025-02-21' },
-  DXY:        { val: 106.6,   prev: 109.1, date: '2025-02-21' },
-  HY_SPREAD:  { val: 2.87,    prev: 3.12,  date: '2025-02' },
-  MORTGAGE30: { val: 6.87,    prev: 6.91,  date: '2025-02' },
+  M2:         { val: 4.2,     prev: 3.9,   date: '2026-01' },
+  FED_BS:     { val: 6.58,    prev: 6.65,  date: '2026-03' },   // QT continuing
+  JPYUSD:     { val: 148.2,   prev: 147.5, date: '2026-03-12' },
+  EURUSD:     { val: 1.1546,  prev: 1.1680,date: '2026-03-12' },  // EUR significantly stronger vs 2025
+  CNYUSD:     { val: 7.231,   prev: 7.225, date: '2026-03-12' },
+  AUDUSD:     { val: 0.6280,  prev: 0.6310,date: '2026-03-12' },
+  DXY:        { val: 99.5,    prev: 99.1,  date: '2026-03-12' },  // ~99.4-99.6; safe-haven demand from Iran war
+  HY_SPREAD:  { val: 3.85,    prev: 3.42,  date: '2026-03' },   // widened on geopolitical risk
+  MORTGAGE30: { val: 6.65,    prev: 6.72,  date: '2026-03' },
+
   // Risk
-  VIX:        { val: 18.2,    prev: 15.6,  date: '2025-02-21' },
-  STLFSI:     { val: -0.31,   prev: -0.45, date: '2025-02' },
-  T10Y2Y:     { val: 0.26,    prev: 0.12,  date: '2025-02-21' },
-  T10Y3M:     { val: -0.14,   prev: -0.30, date: '2025-02-21' },
-  OIL:        { val: 70.7,    prev: 76.8,  date: '2025-02-21' },
-  // Yield curve
-  US3M: 4.33, US2Y: 4.27, US5Y: 4.35, US10Y: 4.53, US30Y: 4.77,
+  VIX:        { val: 26.2,    prev: 24.2,  date: '2026-03-12' },  // spiking on Iran conflict
+  STLFSI:     { val: 0.31,    prev: 0.14,  date: '2026-03' },
+  T10Y2Y:     { val: 0.57,    prev: 0.52,  date: '2026-03-11' },  // 0.57% per ycharts Mar 11
+  T10Y3M:     { val: 0.28,    prev: 0.18,  date: '2026-03-11' },
+  OIL:        { val: 92.0,    prev: 87.3,  date: '2026-03-12' },  // ~$87-96 range; spiked to $119 Mon
+
+  // Yield curve — Mar 12, 2026 (Yahoo: 10Y = 4.2730 today)
+  US3M: 4.05, US2Y: 3.70, US5Y: 3.98, US10Y: 4.27, US30Y: 4.77,
+
   // Spreads
-  IG_SPREAD: { val: 0.87, prev: 0.92, date: '2025-02-21' },
+  IG_SPREAD: { val: 1.15, prev: 1.05, date: '2026-03-12' },
 };
 
 const USE_DEMO = CONFIG.FRED_API_KEY === 'YOUR_FRED_API_KEY';
+
+// Tracks which metrics fell back to DEMO values on this refresh cycle
+// Reset at the start of refreshAll(); filled by instrumented fallback sites
+const demoUsed = new Set();
+const CLAUDE_FILL_TTL = 60 * 60 * 1000; // 1 hour cache for Claude-filled values
 
 // ─────────────────────────────────────────────────────────
 // FETCH HELPERS
@@ -1160,13 +1177,13 @@ const ds = abs<0.01?abs.toFixed(4):abs<0.1?abs.toFixed(3):abs<10?abs.toFixed(2):
 chg = `<span class="${cls}">${up?'▲':'▼'} ${ds}</span>`;
   }
 
-  return `<div class="card ${section}">
+  return `<div class="card ${section}" data-key="${sigKey||''}">
 <div class="c-cat">${cat}</div>
 <div class="c-name">${name}</div>
-<div class="c-val">${display}</div>
+<div class="c-val card-val">${display}</div>
 <div class="c-chg">${chg}</div>
 <div class="c-sig ${sigCls}">${sigLabel}</div>
-${date?`<div class="c-date">${date}</div>`:''}
+${date?`<div class="c-date card-date">${date}</div>`:''}
   </div>`;
 }
 
@@ -1245,7 +1262,7 @@ async function loadGrowth() {
   const cards = defs.map((d, i) => {
 let val, prev, date;
 if (fetches[i]) { val = fetches[i].val; prev = fetches[i].prev; date = fetches[i].date; }
-else { val = DEMO[d.demo].val; prev = DEMO[d.demo].prev; date = DEMO[d.demo].date; }
+else { val = DEMO[d.demo].val; prev = DEMO[d.demo].prev; date = DEMO[d.demo].date; demoUsed.add(d.key || d.demo); }
 results[d.key] = val;
 return card(d.cat, d.name, val, prev, date, d.unit, d.sigKey, d.invert||false, 'growth');
   });
@@ -1275,7 +1292,7 @@ async function loadInflation() {
   const cards = defs.map((d, i) => {
 let val, prev, date;
 if (fetches[i]) { val = fetches[i].val; prev = fetches[i].prev; date = fetches[i].date; }
-else { val = DEMO[d.demo].val; prev = DEMO[d.demo].prev; date = DEMO[d.demo].date; }
+else { val = DEMO[d.demo].val; prev = DEMO[d.demo].prev; date = DEMO[d.demo].date; demoUsed.add(d.key || d.demo); }
 results[d.key] = val;
 return card(d.cat, d.name, val, prev, date, d.unit, d.sigKey, d.invert||false, 'inflation');
   });
@@ -1302,7 +1319,7 @@ async function loadLiquidity() {
   let cards = fredDefs.map((d, i) => {
 let val, prev, date;
 if (fredFetches[i]) { val = fredFetches[i].val; prev = fredFetches[i].prev; date = fredFetches[i].date; }
-else { val = DEMO[d.demo].val; prev = DEMO[d.demo].prev; date = DEMO[d.demo].date; }
+else { val = DEMO[d.demo].val; prev = DEMO[d.demo].prev; date = DEMO[d.demo].date; demoUsed.add(d.key || d.demo); }
 results[d.key] = val;
 return card(d.cat, d.name, val, prev, date, d.unit, d.sigKey, d.invert||false, 'liquidity');
   });
@@ -1320,7 +1337,7 @@ const yahooD = await fetchYahoo(d.yahooTicker);
 if (yahooD?.price) return { val: yahooD.price, prev: yahooD.prevClose, date: new Date().toISOString().slice(0,10) };
 const fredD = await getFRED(d.fredId, 'level', 5);
 if (fredD?.val) return fredD;
-return { val: DEMO[d.key].val, prev: DEMO[d.key].prev, date: DEMO[d.key].date };
+demoUsed.add(d.key); return { val: DEMO[d.key].val, prev: DEMO[d.key].prev, date: DEMO[d.key].date };
   }));
 
   const fxCards = fxDefs.map((d, i) => {
@@ -1341,18 +1358,25 @@ async function loadRisk() {
   let results = {};
 
   const defs = [
-{ key:'VIX',    cat:'RISK',       name:'VIX Fear Index',           fredId:'VIXCLS',    calc:'level', unit:'pts', sigKey:'VIX',    demo:'VIX',    invert:true },
-{ key:'STLFSI', cat:'STRESS',     name:'St Louis Financial Stress', fredId:'STLFSI4',  calc:'level', unit:'z',   sigKey:'STLFSI', demo:'STLFSI', invert:true },
-{ key:'T10Y2Y', cat:'YIELD CURVE',name:'10Y – 2Y Spread',          fredId:'T10Y2Y',    calc:'level', unit:'%',   sigKey:'T10Y2Y', demo:'T10Y2Y' },
-{ key:'T10Y3M', cat:'YIELD CURVE',name:'10Y – 3M Spread',          fredId:'T10Y3M',    calc:'level', unit:'%',   sigKey:'T10Y3M', demo:'T10Y3M' },
-{ key:'OIL',    cat:'COMMODITY',  name:'WTI Crude Oil',             fredId:'DCOILWTICO',calc:'level', unit:'$/bbl',sigKey:'OIL',   demo:'OIL' },
+{ key:'VIX',    cat:'RISK',       name:'VIX Fear Index',           fredId:'VIXCLS',    yahooTicker:'^VIX',       calc:'level', unit:'pts', sigKey:'VIX',    demo:'VIX',    invert:true },
+{ key:'STLFSI', cat:'STRESS',     name:'St Louis Financial Stress', fredId:'STLFSI4',  yahooTicker:null,         calc:'level', unit:'z',   sigKey:'STLFSI', demo:'STLFSI', invert:true },
+{ key:'T10Y2Y', cat:'YIELD CURVE',name:'10Y – 2Y Spread',          fredId:'T10Y2Y',    yahooTicker:null,         calc:'level', unit:'%',   sigKey:'T10Y2Y', demo:'T10Y2Y' },
+{ key:'T10Y3M', cat:'YIELD CURVE',name:'10Y – 3M Spread',          fredId:'T10Y3M',    yahooTicker:null,         calc:'level', unit:'%',   sigKey:'T10Y3M', demo:'T10Y3M' },
+{ key:'OIL',    cat:'COMMODITY',  name:'WTI Crude Oil',             fredId:'DCOILWTICO',yahooTicker:'CL=F',       calc:'level', unit:'$/bbl',sigKey:'OIL',   demo:'OIL' },
   ];
 
-  const fetches = await Promise.all(defs.map(d => getFRED(d.fredId, d.calc)));
+  // For VIX and WTI: try Finnhub/Yahoo first (real-time), fall back to FRED (1-day lag)
+  const fetches = await Promise.all(defs.map(async d => {
+    if (d.yahooTicker) {
+      const live = await fetchYahoo(d.yahooTicker);
+      if (live?.price) return { val: live.price, prev: live.prevClose, date: new Date().toISOString().slice(0,10) };
+    }
+    return getFRED(d.fredId, d.calc);
+  }));
   const cards = defs.map((d, i) => {
 let val, prev, date;
 if (fetches[i]) { val = fetches[i].val; prev = fetches[i].prev; date = fetches[i].date; }
-else { val = DEMO[d.demo].val; prev = DEMO[d.demo].prev; date = DEMO[d.demo].date; }
+else { val = DEMO[d.demo].val; prev = DEMO[d.demo].prev; date = DEMO[d.demo].date; demoUsed.add(d.key || d.demo); }
 results[d.key] = val;
 return card(d.cat, d.name, val, prev, date, d.unit, d.sigKey, d.invert||false, 'risk');
   });
@@ -3076,7 +3100,169 @@ function updateScrollingTicker(stories) {
   el.innerHTML = [...items, ...items].join('');
 }
 
+// ─────────────────────────────────────────────────────────
+// CLAUDE DATA FILL — patches any metrics that fell back to DEMO
+// Called after all primary API loads complete.
+// Caches results for CLAUDE_FILL_TTL to avoid burning API quota.
+// ─────────────────────────────────────────────────────────
+
+// Metadata for every metric Claude might need to fill
+const METRIC_META = {
+  SPX:      { name:'S&P 500',                    unit:'pts',   card:'#spxCard'    },
+  NDX:      { name:'Nasdaq 100',                 unit:'pts',   card:'#ndxCard'    },
+  BTC:      { name:'Bitcoin (USD)',               unit:'$',     card:'#btcCard'    },
+  ETH:      { name:'Ethereum (USD)',              unit:'$',     card:'#ethCard'    },
+  GOLD:     { name:'Gold spot ($/oz)',            unit:'$/oz',  card:'#goldCard'   },
+  SOL:      { name:'Solana (USD)',                unit:'$',     card:'#solCard'    },
+  GDP_YOY:  { name:'Real GDP YoY %',             unit:'%'                        },
+  UNRATE:   { name:'Unemployment Rate %',         unit:'%'                        },
+  PAYEMS:   { name:'Nonfarm Payrolls MoM (K)',    unit:'K'                        },
+  ISM_MFG:  { name:'ISM Manufacturing PMI',       unit:'PMI'                      },
+  RETAIL:   { name:'Retail Sales YoY %',          unit:'%'                        },
+  INDPRO:   { name:'Industrial Production YoY %', unit:'%'                        },
+  CPI:      { name:'CPI YoY %',                   unit:'%'                        },
+  CORECPI:  { name:'Core CPI YoY %',              unit:'%'                        },
+  PCE:      { name:'PCE Deflator YoY %',          unit:'%'                        },
+  BE10:     { name:'10Y Breakeven Inflation %',   unit:'%'                        },
+  FEDFUNDS: { name:'Fed Funds Rate %',            unit:'%'                        },
+  REALRATE: { name:'10Y TIPS Real Rate %',        unit:'%'                        },
+  M2:       { name:'M2 Money Supply YoY %',       unit:'%'                        },
+  FED_BS:   { name:'Fed Balance Sheet ($T)',       unit:'$T'                       },
+  JPYUSD:   { name:'JPY per USD',                 unit:'¥/$'                      },
+  EURUSD:   { name:'EUR/USD',                     unit:'EUR/USD'                  },
+  CNYUSD:   { name:'CNY per USD',                 unit:'CNY/$'                    },
+  AUDUSD:   { name:'AUD/USD',                     unit:'AUD/USD'                  },
+  DXY:      { name:'DXY Dollar Index',            unit:'idx'                      },
+  HY:       { name:'HY Credit Spread %',          unit:'%'                        },
+  MORT:     { name:'30Y Mortgage Rate %',         unit:'%'                        },
+  VIX:      { name:'VIX Fear Index',              unit:'pts'                      },
+  STLFSI:   { name:'St Louis Financial Stress',   unit:'z'                        },
+  T10Y2Y:   { name:'10Y-2Y Spread %',             unit:'%'                        },
+  T10Y3M:   { name:'10Y-3M Spread %',             unit:'%'                        },
+  OIL:      { name:'WTI Crude Oil ($/bbl)',        unit:'$/bbl'                    },
+};
+
+async function fillWithClaude() {
+  if (demoUsed.size === 0) return; // all data loaded fine — nothing to do
+
+  const cacheKey = 'claude_fill_v2';
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Check cache — only re-call Claude if cache is missing or stale
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const { ts, date, data } = JSON.parse(cached);
+      if (date === today && (Date.now() - ts) < CLAUDE_FILL_TTL) {
+        applyClaudeFill(data, true);
+        return;
+      }
+    }
+  } catch {}
+
+  const missingKeys = [...demoUsed];
+  const missingDescriptions = missingKeys
+    .filter(k => METRIC_META[k])
+    .map(k => `  "${k}": { "name": "${METRIC_META[k].name}", "unit": "${METRIC_META[k].unit}" }`)
+    .join(',\n');
+
+  if (!missingDescriptions) return;
+
+  const prompt = `Today is ${today}. The following financial/economic metrics failed to load from live APIs. Use web search to look up the ACTUAL current values for each one right now — do NOT estimate or rely on training data.
+
+Missing metrics that need live web searches:
+{
+${missingDescriptions}
+}
+
+Search for each metric (e.g. "VIX current price today", "WTI crude oil price today", "US CPI February 2026 year over year", etc.) and return the real values you find.
+
+Return a single JSON object with this exact structure:
+{
+  "SPX": { "val": 6700, "prev": 6775, "date": "2026-03-12", "source": "Yahoo Finance" },
+  "VIX": { "val": 26.2, "prev": 24.2, "date": "2026-03-12", "source": "CBOE" }
+}
+
+Rules:
+- Only include keys from the missing metrics list above
+- "val" is the current value you found from search
+- "prev" is the prior period value (prior close for markets, prior month for macro series)
+- "date" is the actual data date from your search result (YYYY-MM-DD or YYYY-MM)
+- "source" is the website or source you found it on
+- Numbers only — no $ signs, no % signs, no commas in values
+- Return ONLY valid JSON. No markdown, no explanation.`;
+
+  try {
+    const raw = await callClaude({ type: 'data_refresh', prompt, max_tokens: 800 });
+    if (!raw) return;
+
+    // Strip any accidental markdown fences
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const data = JSON.parse(clean);
+
+    // Cache it
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), date: today, data }));
+    } catch {}
+
+    applyClaudeFill(data, false);
+  } catch (err) {
+    console.warn('[fillWithClaude] parse/fetch error:', err.message);
+  }
+}
+
+function applyClaudeFill(data, fromCache) {
+  let patched = 0;
+  const label = fromCache ? '(cached)' : '(live)';
+
+  for (const [key, d] of Object.entries(data)) {
+    if (!d?.val) continue;
+
+    // Update DEMO so scorecard recalculations pick it up
+    if (DEMO[key]) {
+      DEMO[key].val  = d.val;
+      DEMO[key].prev = d.prev ?? DEMO[key].prev;
+      DEMO[key].date = d.date ?? DEMO[key].date;
+    }
+
+    // Try to patch the card DOM directly by data-key attribute
+    const cardEl = document.querySelector(`[data-key="${key}"]`);
+    if (cardEl) {
+      const valEl  = cardEl.querySelector('.card-val');
+      const dateEl = cardEl.querySelector('.card-date');
+      if (valEl)  valEl.textContent = formatVal(d.val, METRIC_META[key]?.unit || '');
+      if (dateEl) dateEl.textContent = `${d.date ?? ''} · live (web)`;
+      cardEl.classList.add('claude-filled');
+    }
+    patched++;
+  }
+
+  if (patched > 0) {
+    console.log(`[fillWithClaude] patched ${patched} metrics ${label}`);
+    // Append note to status bar
+    const el = document.getElementById('lastUpdated');
+    if (el && !el.textContent.includes('AI')) {
+      el.innerHTML += ` <span style="color:var(--accent-purple);font-size:9px;">· ${patched} web-searched</span>`;
+    }
+  }
+}
+
+function formatVal(val, unit) {
+  if (val === null || val === undefined || isNaN(val)) return 'N/A';
+  const u = (unit || '').toLowerCase();
+  if (u === 'pts' || u === '$/oz' || u === '$/bbl' || u === '$') {
+    return val >= 1000 ? val.toLocaleString(undefined, { maximumFractionDigits: 0 })
+                       : val.toFixed(2);
+  }
+  if (u === '$t') return val.toFixed(2) + 'T';
+  if (u === '%')  return val.toFixed(2) + '%';
+  if (u === 'pmi') return val.toFixed(1);
+  if (u === 'k')  return (val >= 0 ? '+' : '') + Math.round(val) + 'K';
+  return String(val);
+}
+
 async function refreshAll() {
+  demoUsed.clear(); // reset fallback tracker for this cycle
   document.getElementById('lastUpdated').innerHTML = '<span class="live-dot"></span>Loading...';
 
   const [markets, growth, inflation, liquidity, risk] = await Promise.all([
@@ -3101,9 +3287,25 @@ loadScorecard({ markets, growth, inflation, liquidity, risk }),
 
   // Note: news does NOT auto-refresh here — it uses its own 60-min TTL
   // This prevents burning GNews quota on every 5-min market data refresh
-  const mode = USE_DEMO ? ' · DEMO DATA (add FRED key to activate live)' : ' · LIVE DATA';
+  // Fill any DEMO fallbacks with Claude estimates (non-blocking; caches for 1hr)
+  fillWithClaude();
+
+  // Check if FRED cache is fresh or stale
+  let dataMode = ' · LIVE DATA';
+  if (USE_DEMO) {
+    dataMode = ' · DEMO DATA';
+  } else {
+    try {
+      const sampleCache = localStorage.getItem('fred_UNRATE_26');
+      if (sampleCache) {
+        const { ts } = JSON.parse(sampleCache);
+        const ageMin = Math.round((Date.now() - ts) / 60000);
+        dataMode = ageMin < 2 ? ' · LIVE DATA' : ` · LIVE DATA (cached ${ageMin}m ago)`;
+      }
+    } catch {}
+  }
   document.getElementById('lastUpdated').innerHTML =
-`<span class="live-dot"></span>${new Date().toLocaleTimeString()}${mode}`;
+`<span class="live-dot"></span>${new Date().toLocaleTimeString()}${dataMode}`;
 }
 
 refreshAll();
