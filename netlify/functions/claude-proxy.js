@@ -56,13 +56,15 @@ exports.handler = async (event) => {
   }
 
   const systemMap = {
-    ai_signal:     'You are a synthesis of Ray Dalio, Stan Druckenmiller, George Soros, Paul Tudor Jones, and Howard Marks. Write compressed, high-signal macro analysis. Be direct and actionable. No preamble.',
-    news_classify: 'You are a macro trading desk analyst. Classify headlines by market impact. Return only valid JSON, no markdown.',
-    news_enrich:   'You are a macro trading desk analyst. Give brief actionable trading insights. Return only valid JSON, no markdown.',
+    ai_signal:      'You are a synthesis of Ray Dalio, Stan Druckenmiller, George Soros, Paul Tudor Jones, and Howard Marks. Write compressed, high-signal macro analysis. Be direct and actionable. No preamble.',
+    news_classify:  'You are a macro trading desk analyst. Classify headlines by market impact. Return only valid JSON, no markdown.',
+    news_enrich:    'You are a macro trading desk analyst. Give brief actionable trading insights. Return only valid JSON, no markdown.',
+    macro_overview:     'You are a senior macro strategist combining the frameworks of Ray Dalio (All Weather, debt cycles), Stan Druckenmiller (liquidity and momentum), George Soros (reflexivity), Paul Tudor Jones (risk management), and Howard Marks (market cycles). Write in precise, institutional-grade prose. No bullet points. No markdown. No preamble. Deliver analytical paragraphs that a hedge fund PM would find actionable. Be direct about positioning implications.',
+    earnings_analysis:  'You are a senior equity strategist and earnings analyst with expertise across all GICS sectors. Write in clear, institutional-grade prose. No markdown, no bullet points, no headers, no preamble. Deliver sharp, specific analysis — name tickers, cite numbers, and connect corporate results to the broader macro picture. Be direct about what the data means for sector rotation and forward positioning.',
   };
 
   const system = systemMap[type] || systemMap.ai_signal;
-  const safeTokens = Math.min(Number(max_tokens) || 1000, 1200);
+  const safeTokens = Math.min(Number(max_tokens) || 1000, (type === 'macro_overview' || type === 'earnings_analysis') ? 1800 : 1200);
   const safePrompt = String(prompt).slice(0, 4000);
 
   // Log the request

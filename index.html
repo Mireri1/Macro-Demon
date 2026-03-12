@@ -142,6 +142,47 @@ header{display:flex;align-items:flex-end;justify-content:space-between;padding:2
 .score-name{font-size:10px;letter-spacing:1px;color:var(--text-dim);text-transform:uppercase;}
 
 footer{border-top:1px solid var(--border);padding-top:18px;display:flex;justify-content:space-between;font-size:10px;color:var(--text-dim);letter-spacing:1px;flex-wrap:wrap;gap:8px;}
+
+/* EARNINGS SECTION */
+:root { --col-earnings:#f7931a; }
+.sec-earnings{border-bottom:1px solid rgba(247,147,26,.3);color:var(--col-earnings);}
+.sec-earnings::before{background:var(--col-earnings);}
+.earnings-layout{display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:26px;}
+@media(max-width:900px){.earnings-layout{grid-template-columns:1fr;}}
+.earnings-panel{background:var(--surface);border:1px solid var(--border);padding:18px 20px;}
+.earnings-panel-title{font-size:9px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;}
+.earnings-panel-title span{color:var(--col-earnings);}
+.earnings-table{width:100%;border-collapse:collapse;}
+.earnings-table th{font-size:8px;letter-spacing:1.5px;color:var(--text-dim);text-transform:uppercase;text-align:left;padding:5px 8px 8px;border-bottom:1px solid var(--border);white-space:nowrap;}
+.earnings-table th.r{text-align:right;}
+.earnings-table td{font-size:11px;padding:8px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;}
+.earnings-table tr:last-child td{border-bottom:none;}
+.earnings-table tr:hover td{background:rgba(255,255,255,.02);}
+.e-ticker{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1px;color:var(--text-bright);}
+.e-name{font-size:9px;color:var(--text-dim);margin-top:1px;}
+.e-sector-tag{font-size:8px;letter-spacing:1px;padding:2px 6px;border-radius:2px;background:rgba(247,147,26,.1);color:var(--col-earnings);text-transform:uppercase;}
+.e-beat{color:var(--green);font-size:10px;letter-spacing:.5px;}
+.e-miss{color:var(--red);font-size:10px;letter-spacing:.5px;}
+.e-inline{color:var(--blue);font-size:10px;letter-spacing:.5px;}
+.e-upcoming{color:var(--yellow);font-size:10px;letter-spacing:.5px;}
+.e-val{font-family:'IBM Plex Mono',monospace;font-size:11px;text-align:right;}
+.e-eps-bar{display:flex;align-items:center;gap:6px;justify-content:flex-end;}
+.e-surprise{font-size:9px;padding:1px 5px;border-radius:2px;font-weight:500;}
+.e-surprise.pos{background:rgba(63,185,80,.12);color:var(--green);}
+.e-surprise.neg{background:rgba(248,81,73,.12);color:var(--red);}
+.e-surprise.neu{background:rgba(88,166,255,.08);color:var(--blue);}
+.earnings-sector-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:2px;margin-bottom:4px;}
+.e-sector-card{background:var(--bg);border:1px solid var(--border);border-left:2px solid var(--col-earnings);padding:12px 14px;}
+.e-sector-name{font-size:9px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-bottom:6px;}
+.e-sector-beat-rate{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1px;margin-bottom:2px;}
+.e-sector-sub{font-size:10px;color:var(--text-dim);display:flex;gap:10px;}
+.e-sector-sub .pos{color:var(--green);}
+.e-sector-sub .neg{color:var(--red);}
+.earnings-loading{font-size:11px;color:var(--text-dim);font-style:italic;padding:18px 0;}
+.e-date-badge{font-size:8px;letter-spacing:.5px;padding:2px 5px;border-radius:2px;margin-left:4px;}
+.e-date-badge.today{background:rgba(63,185,80,.15);color:var(--green);}
+.e-date-badge.tomorrow{background:rgba(210,153,34,.12);color:var(--yellow);}
+.e-date-badge.past{background:rgba(88,166,255,.08);color:var(--text-dim);}
 .footer-built{color:var(--text-dim);}
 .footer-built span{color:var(--blue);}
 
@@ -446,6 +487,15 @@ BREAKING
   <div class="ai-text loading" id="aiText">Synthesizing macro signals...</div>
 </div>
 
+<div class="ai-card" id="macroBriefingCard" style="margin-top:12px;display:none;">
+  <div style="font-size:9px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:10px;">
+    <span style="display:inline-block;width:3px;height:12px;background:var(--purple);flex-shrink:0;"></span>
+    MACRO INTELLIGENCE BRIEFING
+    <span id="briefingTimestamp" style="color:var(--text-dim);font-size:8px;"></span>
+  </div>
+  <div class="ai-text loading" id="macroBriefingText" style="font-size:13px;line-height:1.8;white-space:pre-wrap;">Generating intelligence briefing...</div>
+</div>
+
 <div class="news-panel">
   <div class="news-ticker">
 <div class="news-ticker-inner" id="newsTicker">
@@ -511,6 +561,31 @@ BREAKING
 <div class="scorecard">
   <div class="scorecard-title">Macro Scorecard — Regime Composite</div>
   <div class="score-grid" id="scorecard"></div>
+</div>
+
+<!-- EARNINGS SECTION -->
+<div class="sec-head sec-earnings" style="margin-top:10px;">Earnings — Season Tracker</div>
+<div class="earnings-sector-grid" id="earningsSectorGrid">
+  <div class="earnings-loading">Loading sector beat rates...</div>
+</div>
+<div class="earnings-layout" style="margin-top:2px;">
+  <div class="earnings-panel">
+    <div class="earnings-panel-title">Key Earnings — Recent &amp; Upcoming <span id="earningsSeasonLabel"></span></div>
+    <div id="earningsTableWrap"><div class="earnings-loading">Loading earnings...</div></div>
+  </div>
+  <div class="earnings-panel">
+    <div class="earnings-panel-title">Sector Breakdown <span style="color:var(--text-dim);font-size:8px;">beat rate vs estimate</span></div>
+    <div id="earningsSectorDetail"><div class="earnings-loading">Loading sector data...</div></div>
+  </div>
+</div>
+
+<div class="ai-card" id="earningsAiCard" style="margin-bottom:26px;display:none;">
+  <div style="font-size:9px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:10px;">
+    <span style="display:inline-block;width:3px;height:12px;background:var(--col-earnings);flex-shrink:0;"></span>
+    EARNINGS AI ANALYSIS
+    <span id="earningsAiTimestamp" style="color:var(--text-dim);font-size:8px;"></span>
+  </div>
+  <div class="ai-text loading" id="earningsAiText" style="font-size:13px;line-height:1.8;white-space:pre-wrap;">Analyzing earnings data...</div>
 </div>
 
 <div class="chart-panel">
@@ -735,11 +810,13 @@ async function fetchFRED(seriesId, limit = 26) {
   // FRED supports direct browser CORS — no proxy needed
   const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${CONFIG.FRED_API_KEY}&file_type=json&sort_order=desc&limit=${limit}`;
   try {
-    const r = await fetch(url);
+    const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!r.ok) return null;
     const d = await r.json();
     if (d.observations?.length) return d.observations.filter(o => o.value !== '.' && o.value !== '');
-  } catch {}
+  } catch (e) {
+    if (e.name !== 'AbortError') console.warn(`FRED fetch failed for ${seriesId}:`, e.message);
+  }
   return null;
 }
 
@@ -1268,6 +1345,538 @@ return card(d.cat, d.name, val, prev, date, d.unit, d.sigKey, d.invert||false, '
 }
 
 // ─────────────────────────────────────────────────────────
+// EARNINGS — Finnhub calendar + curated key names
+// ─────────────────────────────────────────────────────────
+
+// Curated list: ticker → { name, sector, marketCap (T) }
+const EARNINGS_WATCHLIST = {
+  // TECH
+  AAPL:  { name:'Apple',            sector:'Technology',      mc:3.5  },
+  MSFT:  { name:'Microsoft',        sector:'Technology',      mc:3.1  },
+  NVDA:  { name:'Nvidia',           sector:'Technology',      mc:3.0  },
+  GOOGL: { name:'Alphabet',         sector:'Technology',      mc:2.1  },
+  META:  { name:'Meta',             sector:'Technology',      mc:1.5  },
+  AMZN:  { name:'Amazon',           sector:'Technology',      mc:2.3  },
+  // FINANCIALS
+  JPM:   { name:'JPMorgan Chase',   sector:'Financials',      mc:0.7  },
+  BAC:   { name:'Bank of America',  sector:'Financials',      mc:0.35 },
+  GS:    { name:'Goldman Sachs',    sector:'Financials',      mc:0.18 },
+  MS:    { name:'Morgan Stanley',   sector:'Financials',      mc:0.16 },
+  BLK:   { name:'BlackRock',        sector:'Financials',      mc:0.13 },
+  // HEALTHCARE
+  JNJ:   { name:'Johnson & Johnson',sector:'Healthcare',      mc:0.39 },
+  UNH:   { name:'UnitedHealth',     sector:'Healthcare',      mc:0.45 },
+  LLY:   { name:'Eli Lilly',        sector:'Healthcare',      mc:0.73 },
+  PFE:   { name:'Pfizer',           sector:'Healthcare',      mc:0.17 },
+  // ENERGY
+  XOM:   { name:'ExxonMobil',       sector:'Energy',          mc:0.52 },
+  CVX:   { name:'Chevron',          sector:'Energy',          mc:0.28 },
+  COP:   { name:'ConocoPhillips',   sector:'Energy',          mc:0.14 },
+  // CONSUMER
+  TSLA:  { name:'Tesla',            sector:'Consumer Disc.',  mc:0.85 },
+  WMT:   { name:'Walmart',          sector:'Consumer Staples',mc:0.78 },
+  COST:  { name:'Costco',           sector:'Consumer Staples',mc:0.38 },
+  MCD:   { name:'McDonald\'s',      sector:'Consumer Disc.',  mc:0.22 },
+  // INDUSTRIALS
+  CAT:   { name:'Caterpillar',      sector:'Industrials',     mc:0.19 },
+  BA:    { name:'Boeing',           sector:'Industrials',     mc:0.12 },
+  GE:    { name:'GE Aerospace',     sector:'Industrials',     mc:0.21 },
+  // COMM / MEDIA
+  DIS:   { name:'Disney',           sector:'Comm. Services',  mc:0.19 },
+  NFLX:  { name:'Netflix',          sector:'Comm. Services',  mc:0.40 },
+  // REAL ESTATE / UTILITIES
+  AMT:   { name:'American Tower',   sector:'Real Estate',     mc:0.09 },
+  NEE:   { name:'NextEra Energy',   sector:'Utilities',       mc:0.15 },
+};
+
+const SECTOR_COLORS = {
+  'Technology':       '#58a6ff',
+  'Financials':       '#3fb950',
+  'Healthcare':       '#bc8cff',
+  'Energy':           '#e3894b',
+  'Consumer Disc.':   '#d29922',
+  'Consumer Staples': '#f7931a',
+  'Industrials':      '#58a6ff',
+  'Comm. Services':   '#bc8cff',
+  'Real Estate':      '#3fb950',
+  'Utilities':        '#58a6ff',
+};
+
+// ── Alpha Vantage earnings calendar — free tier, returns real report dates as CSV
+async function fetchAVEarningsCalendar() {
+  try {
+    const url = `https://www.alphavantage.co/query?function=EARNINGS_CALENDAR&horizon=3month&apikey=${CONFIG.ALPHA_VANTAGE_KEY}`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!r.ok) return null;
+    const csv = await r.text();
+    if (!csv || csv.includes('"Information"')) return null; // rate limited
+
+    // Parse CSV: symbol,name,reportDate,fiscalDateEnding,estimate,currency
+    const lines = csv.trim().split('\n').slice(1); // skip header
+    const map = {};
+    lines.forEach(line => {
+      const [symbol, , reportDate, fiscalDateEnding, estimate] = line.split(',');
+      if (symbol && reportDate) {
+        map[symbol.trim()] = {
+          reportDate:        reportDate.trim(),
+          fiscalDateEnding:  fiscalDateEnding?.trim() || null,
+          estimate:          estimate && !isNaN(estimate) ? parseFloat(estimate) : null,
+        };
+      }
+    });
+    return map;
+  } catch { return null; }
+}
+
+async function fetchEpsActual(ticker) {
+  try {
+    const url = `https://finnhub.io/api/v1/stock/earnings?symbol=${ticker}&limit=2&token=${CONFIG.FINNHUB_API_KEY}`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return Array.isArray(d) ? d : null;
+  } catch { return null; }
+}
+
+async function loadEarnings() {
+  const today = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const todayStr = fmt(today);
+
+  const tickers = Object.keys(EARNINGS_WATCHLIST);
+
+  // Fetch in parallel: AV calendar (real upcoming dates) + Finnhub historical EPS (actuals)
+  const [avCalendar, ...epsResults] = await Promise.all([
+    fetchAVEarningsCalendar(),
+    // Batch Finnhub historical EPS — free tier, 8 at a time
+    ...tickers.slice(0, 8).map(t => fetchEpsActual(t)),
+  ]);
+
+  // Fetch remaining Finnhub batches sequentially to avoid rate limit
+  const epsMap = {};
+  tickers.slice(0, 8).forEach((t, i) => { if (epsResults[i]?.length) epsMap[t] = epsResults[i]; });
+
+  const batchSize = 8;
+  for (let i = batchSize; i < tickers.length; i += batchSize) {
+    await new Promise(r => setTimeout(r, 300));
+    const batch = tickers.slice(i, i + batchSize);
+    const results = await Promise.all(batch.map(t => fetchEpsActual(t)));
+    batch.forEach((t, j) => { if (results[j]?.length) epsMap[t] = results[j]; });
+  }
+
+  // Build display rows — AV gives real upcoming dates, Finnhub gives real past actuals
+  const rows = tickers.map(t => {
+    const info      = EARNINGS_WATCHLIST[t];
+    const avEntry   = avCalendar?.[t] || null;   // upcoming: real date from AV
+    const history   = epsMap[t] || [];
+    const latest    = history[0] || null;         // most recent reported quarter
+
+    // AV has this company scheduled upcoming → use that real date
+    if (avEntry) {
+      const reportDate = avEntry.reportDate;
+      const isToday    = reportDate === todayStr;
+      const isFuture   = reportDate > todayStr;
+      const isPast     = reportDate <= todayStr;
+
+      // EPS estimate: prefer AV calendar estimate, fall back to Finnhub
+      const epsEst = avEntry.estimate ?? latest?.estimate ?? null;
+      // EPS actual: only available if already reported (isPast)
+      const epsAct = isPast ? (latest?.actual ?? null) : null;
+      const surprise = (epsAct !== null && epsEst !== null && epsEst !== 0)
+        ? ((epsAct - epsEst) / Math.abs(epsEst)) * 100 : null;
+
+      return { ticker: t, ...info, dateStr: reportDate, isPast, isFuture, isToday, epsEst, epsAct, surprise };
+    }
+
+    // No AV entry → use Finnhub historical only (past report)
+    const dateStr = latest?.period || null;
+    const epsAct  = latest?.actual  ?? null;
+    const epsEst  = latest?.estimate ?? null;
+    const surprise = (epsAct !== null && epsEst !== null && epsEst !== 0)
+      ? ((epsAct - epsEst) / Math.abs(epsEst)) * 100 : null;
+
+    return {
+      ticker: t, ...info,
+      dateStr,
+      isPast:   !!dateStr,
+      isFuture: false,
+      isToday:  false,
+      epsEst, epsAct, surprise,
+    };
+  }).sort((a, b) => {
+    if (a.isFuture && !b.isFuture) return -1;
+    if (!a.isFuture && b.isFuture) return 1;
+    if (a.isFuture && b.isFuture) return (a.dateStr||'').localeCompare(b.dateStr||'');
+    if (a.isPast && b.isPast) return (b.dateStr||'').localeCompare(a.dateStr||'');
+    return 0;
+  });
+
+  // ── MAIN TABLE ──
+  const fmtEps = v => v !== null && !isNaN(v) ? (v >= 0 ? '+' : '') + v.toFixed(2) : '—';
+
+  const tableHTML = `
+<table class="earnings-table">
+  <thead><tr>
+    <th>Company</th>
+    <th>Sector</th>
+    <th>Date</th>
+    <th class="r">EPS Est.</th>
+    <th class="r">EPS Act.</th>
+    <th class="r">Surprise</th>
+  </tr></thead>
+  <tbody>
+  ${rows.slice(0, 20).map(r => {
+    const sectorColor = SECTOR_COLORS[r.sector] || 'var(--blue)';
+    let dateBadge = '';
+    if (r.isToday) dateBadge = '<span class="e-date-badge today">TODAY</span>';
+    else if (r.dateStr) {
+      const tomorrow = new Date(today); tomorrow.setDate(today.getDate()+1);
+      if (r.dateStr === fmt(tomorrow)) dateBadge = '<span class="e-date-badge tomorrow">TMR</span>';
+      else dateBadge = `<span class="e-date-badge ${r.isFuture ? 'tomorrow' : 'past'}">${r.dateStr.slice(5)}</span>`;
+    }
+
+    let statusCell, surpriseCell;
+    if (r.isFuture) {
+      statusCell   = `<span class="e-upcoming">UPCOMING</span>`;
+      surpriseCell = '—';
+    } else {
+      if (r.surprise !== null) {
+        const cls   = r.surprise > 2 ? 'e-beat' : r.surprise < -2 ? 'e-miss' : 'e-inline';
+        const label = r.surprise > 2 ? 'BEAT'   : r.surprise < -2 ? 'MISS'   : 'IN-LINE';
+        statusCell  = `<span class="${cls}">${label}</span>`;
+        const supCls = r.surprise > 0 ? 'pos' : r.surprise < 0 ? 'neg' : 'neu';
+        surpriseCell = `<span class="e-surprise ${supCls}">${r.surprise > 0 ? '+' : ''}${r.surprise.toFixed(1)}%</span>`;
+      } else {
+        statusCell   = r.epsAct !== null ? `<span class="e-inline">REPORTED</span>` : `<span class="e-upcoming">UPCOMING</span>`;
+        surpriseCell = '—';
+      }
+    }
+
+    return `<tr>
+      <td><div class="e-ticker">${r.ticker}</div><div class="e-name">${r.name}</div></td>
+      <td><span class="e-sector-tag" style="background:${sectorColor}18;color:${sectorColor}">${r.sector}</span></td>
+      <td>${dateBadge}</td>
+      <td class="e-val">${fmtEps(r.epsEst)}</td>
+      <td class="e-val">${fmtEps(r.epsAct)}</td>
+      <td class="e-val" style="text-align:right">${surpriseCell}</td>
+    </tr>`;
+  }).join('')}
+  </tbody>
+</table>`;
+
+  document.getElementById('earningsTableWrap').innerHTML = tableHTML;
+
+  // Season label
+  const m = today.getMonth() + 1;
+  const seasonName = m <= 2 ? 'Q4 Season' : m <= 5 ? 'Q1 Season' : m <= 8 ? 'Q2 Season' : 'Q3 Season';
+  const seasonEl = document.getElementById('earningsSeasonLabel');
+  if (seasonEl) seasonEl.textContent = seasonName;
+
+  // Sector summary + AI
+  const sectors = renderEarningsSectors(rows);
+  runEarningsAI(rows, sectors);
+}
+
+
+
+  const tickers = Object.keys(EARNINGS_WATCHLIST);
+
+  // Fetch historical EPS for all watchlist tickers in parallel (free tier endpoint)
+  // Batch into groups of 8 with small delay to avoid rate limiting
+  const epsMap = {};
+  const batchSize = 8;
+  for (let i = 0; i < tickers.length; i += batchSize) {
+    const batch = tickers.slice(i, i + batchSize);
+    const results = await Promise.all(batch.map(t => fetchEpsActual(t)));
+    batch.forEach((t, j) => { if (results[j]?.length) epsMap[t] = results[j]; });
+    if (i + batchSize < tickers.length) await new Promise(r => setTimeout(r, 300));
+  }
+
+  // Build display rows from EPS history
+  const rows = tickers.map(t => {
+    const info    = EARNINGS_WATCHLIST[t];
+    const history = epsMap[t] || [];
+    const latest  = history[0] || null; // most recent reported quarter
+
+    // No AV entry means already reported (outside the 3-month forward window)
+    // Use Finnhub fiscal period date directly — it's the quarter end, close enough for past display
+    const dateStr = latest?.period || null;
+
+    const epsAct  = latest?.actual  ?? null;
+    const epsEst  = latest?.estimate ?? null;
+    const surprise = (epsAct !== null && epsEst !== null && epsEst !== 0)
+      ? ((epsAct - epsEst) / Math.abs(epsEst)) * 100
+      : null;
+
+    return {
+      ticker: t, ...info,
+      dateStr,
+      isPast:   !!dateStr,
+      isFuture: false,
+      isToday:  false,
+      epsEst, epsAct, surprise,
+    };
+  }).sort((a, b) => {
+    if (a.isFuture && !b.isFuture) return -1;
+    if (!a.isFuture && b.isFuture) return 1;
+    if (a.isFuture && b.isFuture) return (a.dateStr||'').localeCompare(b.dateStr||'');
+    if (a.isPast && b.isPast) return (b.dateStr||'').localeCompare(a.dateStr||'');
+    return 0;
+  });
+
+  // ── MAIN TABLE ──
+  const fmtEps = v => v !== null && !isNaN(v) ? (v >= 0 ? '+' : '') + v.toFixed(2) : '—';
+
+  const tableHTML = `
+<table class="earnings-table">
+  <thead><tr>
+    <th>Company</th>
+    <th>Sector</th>
+    <th>Date</th>
+    <th class="r">EPS Est.</th>
+    <th class="r">EPS Act.</th>
+    <th class="r">Surprise</th>
+  </tr></thead>
+  <tbody>
+  ${rows.slice(0, 20).map(r => {
+    const sectorColor = SECTOR_COLORS[r.sector] || 'var(--blue)';
+    let dateBadge = '';
+    if (r.isToday) dateBadge = '<span class="e-date-badge today">TODAY</span>';
+    else if (r.dateStr) {
+      const tomorrow = new Date(today); tomorrow.setDate(today.getDate()+1);
+      if (r.dateStr === fmt(tomorrow)) dateBadge = '<span class="e-date-badge tomorrow">TMR</span>';
+      else dateBadge = `<span class="e-date-badge past">${r.dateStr ? r.dateStr.slice(5) : '—'}</span>`;
+    }
+
+    let statusCell, surpriseCell;
+    if (r.isFuture || (!r.isPast && !r.isFuture)) {
+      statusCell = `<span class="e-upcoming">UPCOMING</span>`;
+      surpriseCell = '—';
+    } else {
+      if (r.surprise !== null) {
+        const cls = r.surprise > 2 ? 'e-beat' : r.surprise < -2 ? 'e-miss' : 'e-inline';
+        const label = r.surprise > 2 ? 'BEAT' : r.surprise < -2 ? 'MISS' : 'IN-LINE';
+        statusCell = `<span class="${cls}">${label}</span>`;
+        const supCls = r.surprise > 0 ? 'pos' : r.surprise < 0 ? 'neg' : 'neu';
+        surpriseCell = `<span class="e-surprise ${supCls}">${r.surprise > 0 ? '+' : ''}${r.surprise.toFixed(1)}%</span>`;
+      } else {
+        statusCell = r.epsAct !== null ? `<span class="e-inline">REPORTED</span>` : `<span class="e-upcoming">UPCOMING</span>`;
+        surpriseCell = '—';
+      }
+    }
+
+    return `<tr>
+      <td><div class="e-ticker">${r.ticker}</div><div class="e-name">${r.name}</div></td>
+      <td><span class="e-sector-tag" style="background:${sectorColor}18;color:${sectorColor}">${r.sector}</span></td>
+      <td>${dateBadge}</td>
+      <td class="e-val">${fmtEps(r.epsEst)}</td>
+      <td class="e-val">${fmtEps(r.epsAct)}</td>
+      <td class="e-val" style="text-align:right">${surpriseCell}</td>
+    </tr>`;
+  }).join('')}
+  </tbody>
+</table>`;
+
+  document.getElementById('earningsTableWrap').innerHTML = tableHTML;
+
+  // Determine season label
+  const m = today.getMonth() + 1;
+  const seasonName = m <= 2 ? 'Q4 Season' : m <= 5 ? 'Q1 Season' : m <= 8 ? 'Q2 Season' : 'Q3 Season';
+  const seasonEl = document.getElementById('earningsSeasonLabel');
+  if (seasonEl) seasonEl.textContent = seasonName;
+
+  // ── SECTOR SUMMARY ──
+  const sectors = renderEarningsSectors(rows);
+  runEarningsAI(rows, sectors);
+}
+
+function renderEarningsSectors(rows) {
+  const sectors = {};
+  rows.forEach(r => {
+    if (!r.isPast) return; // only count reported
+    if (!sectors[r.sector]) sectors[r.sector] = { beats:0, misses:0, inline:0, total:0, surprises:[] };
+    const s = sectors[r.sector];
+    s.total++;
+    if (r.surprise !== null) {
+      s.surprises.push(r.surprise);
+      if (r.surprise > 2)       s.beats++;
+      else if (r.surprise < -2) s.misses++;
+      else                      s.inline++;
+    }
+  });
+
+  const sectorOrder = ['Technology','Financials','Healthcare','Energy','Consumer Disc.','Consumer Staples','Industrials','Comm. Services','Real Estate','Utilities'];
+
+  // Top summary grid
+  const gridHTML = sectorOrder.filter(s => sectors[s]?.total > 0).map(s => {
+    const d = sectors[s];
+    const beatRate = d.total > 0 ? Math.round(d.beats / d.total * 100) : null;
+    const avgSurp = d.surprises.length ? d.surprises.reduce((a,b)=>a+b,0)/d.surprises.length : null;
+    const color = SECTOR_COLORS[s] || 'var(--blue)';
+    const rateColor = beatRate !== null ? (beatRate >= 70 ? 'var(--green)' : beatRate >= 50 ? 'var(--yellow)' : 'var(--red)') : 'var(--text-dim)';
+    return `<div class="e-sector-card" style="border-left-color:${color}">
+  <div class="e-sector-name">${s}</div>
+  <div class="e-sector-beat-rate" style="color:${rateColor}">${beatRate !== null ? beatRate + '%' : '—'}</div>
+  <div class="e-sector-sub">
+    <span>beat rate</span>
+    <span class="pos">${d.beats}↑</span>
+    <span class="neg">${d.misses}↓</span>
+    ${avgSurp !== null ? `<span style="color:var(--text-dim)">${avgSurp > 0 ? '+' : ''}${avgSurp.toFixed(1)}% avg</span>` : ''}
+  </div>
+</div>`;
+  }).join('');
+
+  const sectorGridEl = document.getElementById('earningsSectorGrid');
+  if (sectorGridEl) sectorGridEl.innerHTML = gridHTML || '<div class="earnings-loading">No reported earnings in window yet.</div>';
+
+  // Detailed right panel — sector rows with progress bars
+  const detailHTML = sectorOrder.filter(s => sectors[s]?.total > 0).map(s => {
+    const d = sectors[s];
+    const beatRate = d.total > 0 ? Math.round(d.beats / d.total * 100) : 0;
+    const color = SECTOR_COLORS[s] || 'var(--blue)';
+    return `<div style="margin-bottom:14px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+    <span style="font-size:9px;letter-spacing:1.5px;color:${color};text-transform:uppercase;">${s}</span>
+    <span style="font-size:11px;color:var(--text-dim)">${d.beats}/${d.total} beat</span>
+  </div>
+  <div style="background:var(--border);height:5px;border-radius:2px;">
+    <div style="width:${beatRate}%;height:100%;background:${color};border-radius:2px;transition:width .6s;"></div>
+  </div>
+  <div style="display:flex;gap:10px;margin-top:4px;font-size:9px;color:var(--text-dim);">
+    <span style="color:var(--green)">▲ ${d.beats} beat</span>
+    <span style="color:var(--yellow)">◆ ${d.inline} in-line</span>
+    <span style="color:var(--red)">▼ ${d.misses} miss</span>
+  </div>
+</div>`;
+  }).join('');
+
+  const detailEl = document.getElementById('earningsSectorDetail');
+  if (detailEl) detailEl.innerHTML = detailHTML || '<div class="earnings-loading">Awaiting reported data.</div>';
+  return sectors;
+}
+
+// ─────────────────────────────────────────────────────────
+// AI EARNINGS ANALYSIS
+// ─────────────────────────────────────────────────────────
+async function runEarningsAI(rows, sectors) {
+  const card = document.getElementById('earningsAiCard');
+  const el   = document.getElementById('earningsAiText');
+  const ts   = document.getElementById('earningsAiTimestamp');
+  if (!card || !el) return;
+
+  card.style.display = 'block';
+  el.className = 'ai-text loading';
+  el.textContent = 'Analyzing earnings data...';
+
+  const reported = rows.filter(r => r.isPast && r.surprise !== null);
+  const upcoming = rows.filter(r => r.isFuture);
+
+  const totalReported = reported.length;
+  const totalBeats    = reported.filter(r => r.surprise > 2).length;
+  const totalMisses   = reported.filter(r => r.surprise < -2).length;
+  const totalInline   = totalReported - totalBeats - totalMisses;
+  const overallBeatRate = totalReported ? Math.round(totalBeats / totalReported * 100) : null;
+  const avgSurprise   = reported.length
+    ? (reported.reduce((s, r) => s + r.surprise, 0) / reported.length).toFixed(1)
+    : null;
+
+  // Notable beats and misses
+  const bigBeats  = reported.filter(r => r.surprise > 2).sort((a,b) => b.surprise - a.surprise).slice(0,5);
+  const bigMisses = reported.filter(r => r.surprise < -2).sort((a,b) => a.surprise - b.surprise).slice(0,5);
+
+  // Sector summary
+  const sectorSummary = Object.entries(sectors)
+    .filter(([, d]) => d.total > 0)
+    .map(([name, d]) => {
+      const br = Math.round(d.beats / d.total * 100);
+      const avg = d.surprises.length ? (d.surprises.reduce((a,b)=>a+b,0)/d.surprises.length).toFixed(1) : '—';
+      return `${name}: ${br}% beat rate (${d.beats}/${d.total}, avg surprise ${avg}%)`;
+    }).join('\n');
+
+  const upcomingList = upcoming.slice(0, 8)
+    .map(r => `${r.ticker} (${r.name}) — ${r.dateStr || 'TBD'}, EPS est: ${r.epsEst !== null ? r.epsEst.toFixed(2) : '—'}`)
+    .join('\n');
+
+  const prompt = `You are a senior equity strategist and earnings analyst. Today is ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}.
+
+EARNINGS SEASON SUMMARY:
+Total reported: ${totalReported} companies
+Overall beat rate: ${overallBeatRate !== null ? overallBeatRate + '%' : '—'}
+Beats: ${totalBeats} | Misses: ${totalMisses} | In-line: ${totalInline}
+Average EPS surprise: ${avgSurprise !== null ? avgSurprise + '%' : '—'}
+
+SECTOR BEAT RATES:
+${sectorSummary || 'No sector data available yet.'}
+
+TOP EPS BEATS:
+${bigBeats.map(r => `${r.ticker} (${r.name}, ${r.sector}): +${r.surprise.toFixed(1)}% surprise`).join('\n') || 'None yet.'}
+
+NOTABLE MISSES:
+${bigMisses.map(r => `${r.ticker} (${r.name}, ${r.sector}): ${r.surprise.toFixed(1)}% surprise`).join('\n') || 'None yet.'}
+
+UPCOMING REPORTS TO WATCH:
+${upcomingList || 'None in the next 14 days.'}
+
+MACRO CONTEXT: US tariffs at 145% on China, Fed on hold, gold at $3,000+, AI capex supercycle underway, consumer confidence softening.
+
+Write a concise EARNINGS SEASON INTELLIGENCE BRIEF in 3 focused paragraphs. Plain prose only — no markdown, no bullets, no headers:
+
+Paragraph 1 — SEASON VERDICT: What the overall beat rate and average surprise tell us about the health of corporate earnings right now. Is guidance being sandbagged or are conditions genuinely strong?
+
+Paragraph 2 — SECTOR DIVERGENCE: Which sectors are leading and lagging, and what the divergence reveals about the macro environment — tariff exposure, AI capex tailwinds, consumer stress, credit conditions.
+
+Paragraph 3 — FORWARD WATCH: The 2-3 upcoming reports that matter most for macro signal, and what to look for beyond just EPS (guidance tone, capex plans, China exposure commentary, hiring/layoff language).`;
+
+  const aiText = await callClaude({ type: 'earnings_analysis', prompt, max_tokens: 1000 });
+
+  if (aiText) {
+    el.className = 'ai-text';
+    el.textContent = aiText;
+    if (ts) ts.textContent = '· ' + new Date().toLocaleTimeString();
+  } else {
+    el.className = 'ai-text';
+    el.textContent = totalReported
+      ? `${totalReported} companies reported this season. Overall beat rate: ${overallBeatRate}%. Average EPS surprise: ${avgSurprise}%. Earnings AI briefing unavailable — check proxy rate limits.`
+      : 'No reported earnings data in the current window. AI briefing will generate once companies begin reporting.';
+  }
+}
+
+
+  const SERIES = [
+{ label:'3M',  fredId:'DTB3',  demoKey:'US3M' },
+{ label:'2Y',  fredId:'DGS2',  demoKey:'US2Y' },
+{ label:'5Y',  fredId:'DGS5',  demoKey:'US5Y' },
+{ label:'10Y', fredId:'DGS10', demoKey:'US10Y' },
+{ label:'30Y', fredId:'DGS30', demoKey:'US30Y' },
+  ];
+
+  const yields = await Promise.all(SERIES.map(async s => {
+const obs = await fetchFRED(s.fredId, 3);
+let val;
+if (obs && obs.length > 0) {
+val = gv(obs, 0);
+} else {
+const d = DEMO[s.demoKey];
+val = (d !== null && typeof d === 'object') ? d.val : d;
+}
+return { label: s.label, val };
+  }));
+
+  const maxY = Math.max(...yields.map(y => y.val||0));
+  document.getElementById('yieldCurve').innerHTML = yields.map(({label, val}) => {
+const disp = val!==null&&!isNaN(val) ? val.toFixed(2)+'%' : '—';
+const pct = val&&maxY ? (val/maxY*100) : 0;
+const cls = val&&val>4.5 ? 'wn' : 'nc';
+return `<div class="y-row">
+<span class="y-lbl">${label}</span>
+<div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+<span class="y-val ${cls}">${disp}</span>
+</div>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────────
 // YIELD CURVE
 // ─────────────────────────────────────────────────────────
 async function loadYieldCurve() {
@@ -1505,6 +2114,8 @@ return `<div class="why-item ${cls}">
 </div>`).join('');
 
   await runAI(regime, scores, avg, all);
+  // Run macro briefing in parallel (non-blocking) after AI signal
+  runMacroBriefing(regime, scores, avg, all);
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1533,8 +2144,85 @@ return null;
 }
 
 // ─────────────────────────────────────────────────────────
-// AI SYNTHESIS
+// AI MACRO INTELLIGENCE BRIEFING
+// Comprehensive overview using all loaded indicators + world context
 // ─────────────────────────────────────────────────────────
+async function runMacroBriefing(regime, scores, avg, all) {
+  const card = document.getElementById('macroBriefingCard');
+  const el   = document.getElementById('macroBriefingText');
+  const ts   = document.getElementById('briefingTimestamp');
+  if (!card || !el) return;
+
+  card.style.display = 'block';
+  el.className = 'ai-text loading';
+  el.textContent = 'Generating intelligence briefing...';
+
+  const G = all.growth     || {};
+  const I = all.inflation  || {};
+  const L = all.liquidity  || {};
+  const R = all.risk       || {};
+  const M = all.markets    || {};
+
+  const fmt = (v, d=2) => (v != null && !isNaN(v)) ? Number(v).toFixed(d) : '—';
+
+  const prompt = `You are a synthesis of Ray Dalio, Stan Druckenmiller, George Soros, Paul Tudor Jones, and Howard Marks. Today is ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}.
+
+LIVE MACRO DASHBOARD READINGS:
+Regime: ${regime} (Composite score: ${avg}/100)
+Growth: ${scores[0].score}/100 | Inflation Stability: ${scores[1].score}/100 | Liquidity: ${scores[2].score}/100 | Risk/Sentiment: ${scores[3].score}/100
+
+MARKETS:
+S&P 500: ${fmt(M.spx,0)} | Nasdaq 100: ${fmt(M.ndx,0)} | Gold: $${fmt(M.goldVal,0)}/oz
+Bitcoin: $${fmt(M.btcVal,0)} | Total Crypto Cap: $${fmt(M.totalCap,0)}T
+
+GROWTH & LABOR:
+Real GDP YoY: ${fmt(G.GDP_YOY)}% | Unemployment: ${fmt(G.UNRATE)}% | NFP MoM: ${fmt(G.PAYEMS,0)}K
+ISM Manufacturing: ${fmt(G.ISM_MFG,1)} | Retail Sales YoY: ${fmt(G.RETAIL)}% | Industrial Production YoY: ${fmt(G.INDPRO)}%
+
+INFLATION & POLICY:
+CPI YoY: ${fmt(I.CPI)}% | Core CPI YoY: ${fmt(I.CORECPI)}% | PCE YoY: ${fmt(I.PCE)}%
+Fed Funds Rate: ${fmt(I.FEDFUNDS)}% | 10Y Breakeven Inflation: ${fmt(I.BE10)}% | Real 10Y Rate (TIPS): ${fmt(I.REALRATE)}%
+
+LIQUIDITY & CREDIT:
+M2 YoY: ${fmt(L.M2)}% | Fed Balance Sheet: $${fmt(L.FED_BS,2)}T | HY Spread: ${fmt(L.HY)}%
+30Y Mortgage: ${fmt(L.MORT)}% | DXY: ${fmt(L.DXY,1)} | EUR/USD: ${fmt(L.EURUSD,4)} | JPY/USD: ${fmt(L.JPYUSD,1)}¥
+
+RISK & SENTIMENT:
+VIX: ${fmt(R.VIX,1)} | St. Louis Financial Stress: ${fmt(R.STLFSI,2)} | WTI Oil: $${fmt(R.OIL,1)}
+10Y–2Y Spread: ${fmt(R.T10Y2Y)}% | 10Y–3M Spread: ${fmt(R.T10Y3M)}%
+
+CURRENT WORLD CONTEXT (March 2025):
+- US tariffs on China at 145%, EU retaliation underway — trade war in full escalation
+- Fed holding rates, next FOMC March 18–19, markets pricing ~1 cut in 2025
+- Gold broke $3,000/oz, central bank buying at 55-year highs
+- US debt ceiling standoff, Treasury X-date estimated mid-2025
+- Big Tech committed $300B+ in AI capex for 2025
+- Ukraine-Russia ceasefire talks stalled; Taiwan Strait tensions elevated
+- BRICS payment rails bypassing SWIFT operational in 6 members
+
+Write a MACRO INTELLIGENCE BRIEFING in the following structure. Use plain text, no markdown headers, no bullets. Write in flowing analytical prose — 4 concise paragraphs:
+
+Paragraph 1 — REGIME DIAGNOSIS: What the current composite of indicators tells us about where we are in the macro cycle. Be specific about which indicators are most instructive.
+
+Paragraph 2 — KEY TENSIONS: The two or three forces in direct conflict right now (e.g., sticky inflation vs. slowing growth, tariff shock vs. Fed neutrality). What does the data suggest will break first?
+
+Paragraph 3 — TAIL RISKS: The one or two scenarios that could rapidly change the regime. What specific data prints or events would confirm a regime shift?
+
+Paragraph 4 — POSITIONING IMPLICATIONS: Concrete, asset-class level guidance for the current environment. Which sectors, durations, and geographies to favor or avoid. Be direct.`;
+
+  const aiText = await callClaude({ type: 'macro_overview', prompt, max_tokens: 1200 });
+
+  if (aiText) {
+    el.className = 'ai-text';
+    el.textContent = aiText;
+    if (ts) ts.textContent = '· ' + new Date().toLocaleTimeString();
+  } else {
+    el.className = 'ai-text';
+    el.textContent = `Regime: ${regime} — Briefing unavailable (rate limit or proxy error). Composite: ${avg}/100. Key watch: yield curve at ${fmt(R.T10Y2Y)}%, VIX at ${fmt(R.VIX,1)}, HY spreads at ${fmt(L.HY)}%.`;
+  }
+}
+
+
 async function runAI(regime, scores, avg, all) {
   const el = document.getElementById('aiText');
   el.className = 'ai-text loading';
@@ -1670,6 +2358,43 @@ impact:'bear', impactLabel:'BEARISH', time:'Mar 2025' },
 
 let activeTab = 'all';
 let newsEnriched = false;
+
+// Global dedup set — prevents same article from appearing in both breaking bar and news grid
+const seenArticleUrls = new Set();
+
+// Global relevance filter — shared by fetchLiveNews AND loadBreakingNews
+const MACRO_RELEVANT = [
+  'federal reserve','fed','fomc','interest rate','treasury','yield','inflation','cpi','pce',
+  'gdp','recession','debt','deficit','tariff','trade war','sanctions','geopolit',
+  'brics','dollar','currency','forex','devaluat','petrodollar','swift',
+  'opec','oil','gold','silver','copper','commodity','energy','crude',
+  'nvidia','ai','artificial intelligence','semiconductor','chip','data center',
+  'stock','s&p','nasdaq','market','equity','bond','credit','spread','default',
+  'bank','banking','jpmorgan','blackrock','powell','yellen','lagarde',
+  'china','russia','ukraine','taiwan','middle east','iran','saudi',
+  'bitcoin','crypto','ethereum','blockchain','coinbase',
+  'imf','world bank','g7','g20','oecd','wto','nato',
+];
+const IRRELEVANT_BLOCKS = [
+  'celebrity','kardashian','taylor swift','beyoncé','nfl draft','nba trade','oscar','grammy',
+  'movie','film','actor','actress','singer','musician','concert','album','tour',
+  'recipe','food','restaurant','diet','workout','fitness','weight loss',
+  'fashion','style','beauty','makeup','skincare',
+  'relationship','dating','marriage','divorce','baby','pregnancy',
+  'sports score','game recap','touchdown','goal scored','home run','slam dunk',
+  'reality tv','bachelor','survivor','tiktok dance','instagram model',
+];
+const isRelevant = (title = '', desc = '') => {
+  const txt = (title + ' ' + desc).toLowerCase();
+  if (IRRELEVANT_BLOCKS.some(kw => txt.includes(kw))) return false;
+  return MACRO_RELEVANT.some(kw => txt.includes(kw));
+};
+// Collision-resistant hash for stable article IDs
+const hashUrl = (url = '') => {
+  let h = 0;
+  for (let i = 0; i < url.length; i++) h = (Math.imul(31, h) + url.charCodeAt(i)) | 0;
+  return Math.abs(h).toString(36);
+};
 
 function showTab(tab, btn) {
   activeTab = tab;
@@ -1858,26 +2583,32 @@ return newsCache[tab] || null;
       brics:'#d29922', commodities:'#e3894b', credit:'#f85149'
     };
 
-    // Strip anything older than 7 days client-side
+    // Filter: older than 7 days, already seen cross-feed, or off-topic (uses global isRelevant/hashUrl)
     const sevenDaysAgo = Date.now() - 7*24*60*60*1000;
     const stories = d.results
       .filter(a => !a.pubDate || new Date(a.pubDate).getTime() > sevenDaysAgo)
+      .filter(a => a.link && !seenArticleUrls.has(a.link))
+      .filter(a => isRelevant(a.title, a.description))
       .slice(0, 9)
-      .map((a, i) => ({
-        id:          'live_' + tab + '_' + i,
-        cat:         tab,
-        catLabel:    CAT_LABELS[tab] || 'Macro Intel',
-        color:       CAT_COLORS[tab] || '#58a6ff',
-        headline:    a.title?.replace(/ - .*$/, '').replace(/ \| .*$/, '') || 'Breaking',
-        body:        a.description || a.content?.slice(0, 200) || 'Click to read the full story.',
-        impact:      'watch',
-        impactLabel: 'LIVE',
-        time:        a.pubDate
-                       ? new Date(a.pubDate).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
-                       : 'Today',
-        url:         a.link,
-        source:      a.source_id || '',
-      }));
+      .map((a) => {
+        const stableId = 'live_' + hashUrl(a.link || a.title || String(Date.now()));
+        seenArticleUrls.add(a.link);
+        return {
+          id:          stableId,
+          cat:         tab,
+          catLabel:    CAT_LABELS[tab] || 'Macro Intel',
+          color:       CAT_COLORS[tab] || '#58a6ff',
+          headline:    a.title?.replace(/ - .*$/, '').replace(/ \| .*$/, '') || 'Breaking',
+          body:        a.description || a.content?.slice(0, 200) || 'Click to read the full story.',
+          impact:      'watch',
+          impactLabel: 'LIVE',
+          time:        a.pubDate
+                         ? new Date(a.pubDate).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+                         : 'Today',
+          url:         a.link,
+          source:      a.source_id || '',
+        };
+      });
 
     if (!stories.length) return null;
     newsCache[tab] = stories;
@@ -2315,7 +3046,10 @@ activeAssets.add(key); el.classList.remove('off');
 window.addEventListener('resize', ()=>{ syncOverlay(); redrawOverlay(); });
 
 // Initialize news on load
-renderNews();
+renderNews().then(() => {
+  // Breaking news fires AFTER renderNews completes so seenArticleUrls is populated first
+  setTimeout(loadBreakingNews, 500);
+});
 setTimeout(enrichNewsWithAI, 3000); // Wait for dashboard data to load first
 
 // ─────────────────────────────────────────────────────────
@@ -2400,13 +3134,23 @@ const r   = await fetch(url);
 if (!r.ok) throw new Error('NewsData error');
 const d   = await r.json();
 if (!d.results?.length) throw new Error('No articles');
-// Map NewsData format to our expected format
-const articles = d.results.map(a => ({
-title:       a.title,
-publishedAt: a.pubDate,
-source:      { name: a.source_id || '' },
-url:         a.link,
-}));
+// Map NewsData format to our expected format, deduping against news grid articles and filtering off-topic
+const articles = d.results
+  .filter(a => {
+    const txt = ((a.title||'') + ' ' + (a.description||'')).toLowerCase();
+    if (IRRELEVANT_BLOCKS.some(kw => txt.includes(kw))) return false;
+    if (a.link && seenArticleUrls.has(a.link)) return false;
+    return true;
+  })
+  .map(a => {
+    seenArticleUrls.add(a.link);
+    return {
+      title:       a.title,
+      publishedAt: a.pubDate,
+      source:      { name: a.source_id || '' },
+      url:         a.link,
+    };
+  });
 breakingRenderTrack(articles);
 // Also push breaking headlines to the scrolling ticker
 updateScrollingTicker(articles.map(a => ({
@@ -2430,8 +3174,7 @@ breakingRenderTrack(fallback);
   }
 }
 
-// Breaking news: load after news cards have had time to populate (3s), then every 60 min
-setTimeout(loadBreakingNews, 3000);
+// Breaking news: refreshes every 60 min (initial load triggered after renderNews completes above)
 setInterval(loadBreakingNews, 60 * 60 * 1000);
 
 // ─────────────────────────────────────────────────────────
@@ -2478,6 +3221,7 @@ loadRisk(),
 loadYieldCurve(),
 loadSpreads(),
 loadScorecard({ markets, growth, inflation, liquidity, risk }),
+loadEarnings(),
   ]);
 
   // Init chart after data loads
@@ -2497,6 +3241,7 @@ setInterval(refreshAll, 5 * 60 * 1000);
 setInterval(() => {
   delete newsCache[activeTab];
   delete newsCacheTime[activeTab];
+  seenArticleUrls.clear(); // reset dedup set so next cycle can repopulate
   // Don't call renderNews here — wait for user to interact or next refreshAll
   // This avoids burning a request if nobody is looking at the news section
 }, 60 * 60 * 1000);
