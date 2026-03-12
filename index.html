@@ -806,17 +806,33 @@ const USE_DEMO = CONFIG.FRED_API_KEY === 'YOUR_FRED_API_KEY';
 // ─────────────────────────────────────────────────────────
 // FETCH HELPERS
 // ─────────────────────────────────────────────────────────
+const FRED_CACHE_TTL = 60 * 60 * 1000; // 1 hour in ms
 async function fetchFRED(seriesId, limit = 26) {
   if (USE_DEMO) return null;
-  // FRED supports direct browser CORS — no proxy needed
+  const cacheKey = `fred_${seriesId}_${limit}`;
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const { ts, data } = JSON.parse(cached);
+      if (Date.now() - ts < FRED_CACHE_TTL) return data;
+    }
+  } catch {}
   const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${CONFIG.FRED_API_KEY}&file_type=json&sort_order=desc&limit=${limit}`;
   try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
     if (!r.ok) return null;
     const d = await r.json();
-    if (d.observations?.length) return d.observations.filter(o => o.value !== '.' && o.value !== '');
+    if (d.observations?.length) {
+      const data = d.observations.filter(o => o.value !== '.' && o.value !== '');
+      try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data })); } catch {}
+      return data;
+    }
   } catch (e) {
     if (e.name !== 'AbortError') console.warn(`FRED fetch failed for ${seriesId}:`, e.message);
+    try {
+      const stale = localStorage.getItem(cacheKey);
+      if (stale) return JSON.parse(stale).data;
+    } catch {}
   }
   return null;
 }
@@ -1582,7 +1598,7 @@ async function loadEarnings() {
 function renderEarningsSectors(rows) {
   const sectors = {};
   rows.forEach(r => {
-    if (!r.isPast) return; // only count reported
+    if (r.epsAct === null) return; // only count companies with actual EPS data
     if (!sectors[r.sector]) sectors[r.sector] = { beats:0, misses:0, inline:0, total:0, surprises:[] };
     const s = sectors[r.sector];
     s.total++;
@@ -1708,15 +1724,15 @@ ${upcomingList || 'None in the next 14 days.'}
 
 MACRO CONTEXT: US tariffs at 145% on China, Fed on hold, gold at $3,000+, AI capex supercycle underway, consumer confidence softening.
 
-Write a concise EARNINGS SEASON INTELLIGENCE BRIEF in 3 focused paragraphs. Plain prose only — no markdown, no bullets, no headers:
+Write a tight 2-paragraph EARNINGS BRIEF. Plain prose only — no markdown, no headers, no preamble. Be specific — cite numbers and tickers. 4-6 sentences total.
 
-Paragraph 1 — SEASON VERDICT: What the overall beat rate and average surprise tell us about the health of corporate earnings right now. Is guidance being sandbagged or are conditions genuinely strong?
+Paragraph 1 — VERDICT: Overall beat rate and the standout sector divergences. Name the notable beats and misses by ticker.
 
-Paragraph 2 — SECTOR DIVERGENCE: Which sectors are leading and lagging, and what the divergence reveals about the macro environment — tariff exposure, AI capex tailwinds, consumer stress, credit conditions.
+Paragraph 2 — FORWARD WATCH: The 1-2 upcoming reports with most macro signal and what to watch beyond just EPS numbers.`;
 
-Paragraph 3 — FORWARD WATCH: The 2-3 upcoming reports that matter most for macro signal, and what to look for beyond just EPS (guidance tone, capex plans, China exposure commentary, hiring/layoff language).`;
 
-  const aiText = await callClaude({ type: 'earnings_analysis', prompt, max_tokens: 1000 });
+
+  const aiText = await callClaude({ type: 'earnings_analysis', prompt, max_tokens: 600 });
 
   if (aiText) {
     el.className = 'ai-text';
@@ -2054,17 +2070,17 @@ CURRENT WORLD CONTEXT (March 2025):
 - Ukraine-Russia ceasefire talks stalled; Taiwan Strait tensions elevated
 - BRICS payment rails bypassing SWIFT operational in 6 members
 
-Write a MACRO INTELLIGENCE BRIEFING in the following structure. Use plain text, no markdown headers, no bullets. Write in flowing analytical prose — 4 concise paragraphs:
+Write a tight 2-paragraph MACRO BRIEF. Plain prose, no markdown, no headers, no preamble. Direct and specific — cite actual indicator readings. 5-7 sentences total.
 
-Paragraph 1 — REGIME DIAGNOSIS: What the current composite of indicators tells us about where we are in the macro cycle. Be specific about which indicators are most instructive.
+Paragraph 1 — REGIME & TENSIONS: Where we are in the macro cycle right now and the key conflicting forces. Which indicators are most instructive.
 
-Paragraph 2 — KEY TENSIONS: The two or three forces in direct conflict right now (e.g., sticky inflation vs. slowing growth, tariff shock vs. Fed neutrality). What does the data suggest will break first?
+Paragraph 2 — POSITIONING: Concrete asset-class guidance for this environment. Be direct about what to favor or avoid.`;
 
-Paragraph 3 — TAIL RISKS: The one or two scenarios that could rapidly change the regime. What specific data prints or events would confirm a regime shift?
 
-Paragraph 4 — POSITIONING IMPLICATIONS: Concrete, asset-class level guidance for the current environment. Which sectors, durations, and geographies to favor or avoid. Be direct.`;
 
-  const aiText = await callClaude({ type: 'macro_overview', prompt, max_tokens: 1200 });
+
+
+  const aiText = await callClaude({ type: 'macro_overview', prompt, max_tokens: 700 });
 
   if (aiText) {
     el.className = 'ai-text';
