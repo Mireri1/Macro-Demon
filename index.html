@@ -565,6 +565,16 @@ BREAKING
 
 <!-- EARNINGS SECTION -->
 <div class="sec-head sec-earnings" style="margin-top:10px;">Earnings — Season Tracker</div>
+
+<div class="ai-card" id="earningsAiCard" style="margin-bottom:8px;display:none;">
+  <div style="font-size:9px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:10px;">
+    <span style="display:inline-block;width:3px;height:12px;background:var(--col-earnings);flex-shrink:0;"></span>
+    EARNINGS AI ANALYSIS
+    <span id="earningsAiTimestamp" style="color:var(--text-dim);font-size:8px;"></span>
+  </div>
+  <div class="ai-text loading" id="earningsAiText" style="font-size:13px;line-height:1.8;white-space:pre-wrap;">Analyzing earnings data...</div>
+</div>
+
 <div class="earnings-sector-grid" id="earningsSectorGrid">
   <div class="earnings-loading">Loading sector beat rates...</div>
 </div>
@@ -577,15 +587,6 @@ BREAKING
     <div class="earnings-panel-title">Sector Breakdown <span style="color:var(--text-dim);font-size:8px;">beat rate vs estimate</span></div>
     <div id="earningsSectorDetail"><div class="earnings-loading">Loading sector data...</div></div>
   </div>
-</div>
-
-<div class="ai-card" id="earningsAiCard" style="margin-bottom:26px;display:none;">
-  <div style="font-size:9px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:10px;">
-    <span style="display:inline-block;width:3px;height:12px;background:var(--col-earnings);flex-shrink:0;"></span>
-    EARNINGS AI ANALYSIS
-    <span id="earningsAiTimestamp" style="color:var(--text-dim);font-size:8px;"></span>
-  </div>
-  <div class="ai-text loading" id="earningsAiText" style="font-size:13px;line-height:1.8;white-space:pre-wrap;">Analyzing earnings data...</div>
 </div>
 
 <div class="chart-panel">
@@ -1457,9 +1458,9 @@ async function loadEarnings() {
   const epsMap = {};
   tickers.slice(0, 8).forEach((t, i) => { if (epsResults[i]?.length) epsMap[t] = epsResults[i]; });
 
-  const batchSize = 8;
+  const batchSize = 12; // larger batches ok since we're not blocking main dashboard
   for (let i = batchSize; i < tickers.length; i += batchSize) {
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 200));
     const batch = tickers.slice(i, i + batchSize);
     const results = await Promise.all(batch.map(t => fetchEpsActual(t)));
     batch.forEach((t, j) => { if (results[j]?.length) epsMap[t] = results[j]; });
@@ -1574,119 +1575,6 @@ async function loadEarnings() {
   if (seasonEl) seasonEl.textContent = seasonName;
 
   // Sector summary + AI
-  const sectors = renderEarningsSectors(rows);
-  runEarningsAI(rows, sectors);
-}
-
-
-
-  const tickers = Object.keys(EARNINGS_WATCHLIST);
-
-  // Fetch historical EPS for all watchlist tickers in parallel (free tier endpoint)
-  // Batch into groups of 8 with small delay to avoid rate limiting
-  const epsMap = {};
-  const batchSize = 8;
-  for (let i = 0; i < tickers.length; i += batchSize) {
-    const batch = tickers.slice(i, i + batchSize);
-    const results = await Promise.all(batch.map(t => fetchEpsActual(t)));
-    batch.forEach((t, j) => { if (results[j]?.length) epsMap[t] = results[j]; });
-    if (i + batchSize < tickers.length) await new Promise(r => setTimeout(r, 300));
-  }
-
-  // Build display rows from EPS history
-  const rows = tickers.map(t => {
-    const info    = EARNINGS_WATCHLIST[t];
-    const history = epsMap[t] || [];
-    const latest  = history[0] || null; // most recent reported quarter
-
-    // No AV entry means already reported (outside the 3-month forward window)
-    // Use Finnhub fiscal period date directly — it's the quarter end, close enough for past display
-    const dateStr = latest?.period || null;
-
-    const epsAct  = latest?.actual  ?? null;
-    const epsEst  = latest?.estimate ?? null;
-    const surprise = (epsAct !== null && epsEst !== null && epsEst !== 0)
-      ? ((epsAct - epsEst) / Math.abs(epsEst)) * 100
-      : null;
-
-    return {
-      ticker: t, ...info,
-      dateStr,
-      isPast:   !!dateStr,
-      isFuture: false,
-      isToday:  false,
-      epsEst, epsAct, surprise,
-    };
-  }).sort((a, b) => {
-    if (a.isFuture && !b.isFuture) return -1;
-    if (!a.isFuture && b.isFuture) return 1;
-    if (a.isFuture && b.isFuture) return (a.dateStr||'').localeCompare(b.dateStr||'');
-    if (a.isPast && b.isPast) return (b.dateStr||'').localeCompare(a.dateStr||'');
-    return 0;
-  });
-
-  // ── MAIN TABLE ──
-  const fmtEps = v => v !== null && !isNaN(v) ? (v >= 0 ? '+' : '') + v.toFixed(2) : '—';
-
-  const tableHTML = `
-<table class="earnings-table">
-  <thead><tr>
-    <th>Company</th>
-    <th>Sector</th>
-    <th>Date</th>
-    <th class="r">EPS Est.</th>
-    <th class="r">EPS Act.</th>
-    <th class="r">Surprise</th>
-  </tr></thead>
-  <tbody>
-  ${rows.slice(0, 20).map(r => {
-    const sectorColor = SECTOR_COLORS[r.sector] || 'var(--blue)';
-    let dateBadge = '';
-    if (r.isToday) dateBadge = '<span class="e-date-badge today">TODAY</span>';
-    else if (r.dateStr) {
-      const tomorrow = new Date(today); tomorrow.setDate(today.getDate()+1);
-      if (r.dateStr === fmt(tomorrow)) dateBadge = '<span class="e-date-badge tomorrow">TMR</span>';
-      else dateBadge = `<span class="e-date-badge past">${r.dateStr ? r.dateStr.slice(5) : '—'}</span>`;
-    }
-
-    let statusCell, surpriseCell;
-    if (r.isFuture || (!r.isPast && !r.isFuture)) {
-      statusCell = `<span class="e-upcoming">UPCOMING</span>`;
-      surpriseCell = '—';
-    } else {
-      if (r.surprise !== null) {
-        const cls = r.surprise > 2 ? 'e-beat' : r.surprise < -2 ? 'e-miss' : 'e-inline';
-        const label = r.surprise > 2 ? 'BEAT' : r.surprise < -2 ? 'MISS' : 'IN-LINE';
-        statusCell = `<span class="${cls}">${label}</span>`;
-        const supCls = r.surprise > 0 ? 'pos' : r.surprise < 0 ? 'neg' : 'neu';
-        surpriseCell = `<span class="e-surprise ${supCls}">${r.surprise > 0 ? '+' : ''}${r.surprise.toFixed(1)}%</span>`;
-      } else {
-        statusCell = r.epsAct !== null ? `<span class="e-inline">REPORTED</span>` : `<span class="e-upcoming">UPCOMING</span>`;
-        surpriseCell = '—';
-      }
-    }
-
-    return `<tr>
-      <td><div class="e-ticker">${r.ticker}</div><div class="e-name">${r.name}</div></td>
-      <td><span class="e-sector-tag" style="background:${sectorColor}18;color:${sectorColor}">${r.sector}</span></td>
-      <td>${dateBadge}</td>
-      <td class="e-val">${fmtEps(r.epsEst)}</td>
-      <td class="e-val">${fmtEps(r.epsAct)}</td>
-      <td class="e-val" style="text-align:right">${surpriseCell}</td>
-    </tr>`;
-  }).join('')}
-  </tbody>
-</table>`;
-
-  document.getElementById('earningsTableWrap').innerHTML = tableHTML;
-
-  // Determine season label
-  const m = today.getMonth() + 1;
-  const seasonName = m <= 2 ? 'Q4 Season' : m <= 5 ? 'Q1 Season' : m <= 8 ? 'Q2 Season' : 'Q3 Season';
-  const seasonEl = document.getElementById('earningsSeasonLabel');
-  if (seasonEl) seasonEl.textContent = seasonName;
-
-  // ── SECTOR SUMMARY ──
   const sectors = renderEarningsSectors(rows);
   runEarningsAI(rows, sectors);
 }
@@ -1840,40 +1728,6 @@ Paragraph 3 — FORWARD WATCH: The 2-3 upcoming reports that matter most for mac
       ? `${totalReported} companies reported this season. Overall beat rate: ${overallBeatRate}%. Average EPS surprise: ${avgSurprise}%. Earnings AI briefing unavailable — check proxy rate limits.`
       : 'No reported earnings data in the current window. AI briefing will generate once companies begin reporting.';
   }
-}
-
-
-  const SERIES = [
-{ label:'3M',  fredId:'DTB3',  demoKey:'US3M' },
-{ label:'2Y',  fredId:'DGS2',  demoKey:'US2Y' },
-{ label:'5Y',  fredId:'DGS5',  demoKey:'US5Y' },
-{ label:'10Y', fredId:'DGS10', demoKey:'US10Y' },
-{ label:'30Y', fredId:'DGS30', demoKey:'US30Y' },
-  ];
-
-  const yields = await Promise.all(SERIES.map(async s => {
-const obs = await fetchFRED(s.fredId, 3);
-let val;
-if (obs && obs.length > 0) {
-val = gv(obs, 0);
-} else {
-const d = DEMO[s.demoKey];
-val = (d !== null && typeof d === 'object') ? d.val : d;
-}
-return { label: s.label, val };
-  }));
-
-  const maxY = Math.max(...yields.map(y => y.val||0));
-  document.getElementById('yieldCurve').innerHTML = yields.map(({label, val}) => {
-const disp = val!==null&&!isNaN(val) ? val.toFixed(2)+'%' : '—';
-const pct = val&&maxY ? (val/maxY*100) : 0;
-const cls = val&&val>4.5 ? 'wn' : 'nc';
-return `<div class="y-row">
-<span class="y-lbl">${label}</span>
-<div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
-<span class="y-val ${cls}">${disp}</span>
-</div>`;
-  }).join('');
 }
 
 // ─────────────────────────────────────────────────────────
@@ -3221,8 +3075,10 @@ loadRisk(),
 loadYieldCurve(),
 loadSpreads(),
 loadScorecard({ markets, growth, inflation, liquidity, risk }),
-loadEarnings(),
   ]);
+
+  // Earnings loads independently — 35 API calls, don't block the main dashboard
+  loadEarnings();
 
   // Init chart after data loads
   initChart();
