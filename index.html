@@ -3637,8 +3637,7 @@ async function loadEarnings() {
   const wrap = document.getElementById('earningsTableWrap');
   if (wrap) wrap.innerHTML = '<div class="earnings-loading">Fetching earnings via AI...</div>';
 
-  const tickerList = tickers.map(t => `  "${t}": "${EARNINGS_WATCHLIST[t].name} (${EARNINGS_WATCHLIST[t].sector})"`).join(',
-');
+  const tickerList = tickers.map(t => `  "${t}": "${EARNINGS_WATCHLIST[t].name} (${EARNINGS_WATCHLIST[t].sector})"`).join(',\n');
   const prompt = `Today is ${todayStr}. Search the web for earnings data for these companies. For each find the most recent quarterly report date and EPS, plus any upcoming scheduled date.
 
 Tickers:
