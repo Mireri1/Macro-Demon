@@ -2419,28 +2419,58 @@ function breakingRenderTrack(stories) {
 }
 
 async function loadBreakingNews(forceRefresh = false) {
-  // Don't force-refresh if budget is gone (manual refresh button still respects limit)
-  if (!gnewsCanFetch()) {
-    console.warn(`GNews budget exhausted — breaking news using cache. ${gnewsRemaining()} requests remaining today.`);
-    if (breakingStories.length) return; // keep showing what we have
+  const CACHE_KEY = 'breaking_news_claude_v1';
+  const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+  // Check cache first unless force refresh
+  if (!forceRefresh) {
+    try {
+      const cached = sessionStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { ts, stories } = JSON.parse(cached);
+        if (Date.now() - ts < CACHE_TTL && stories?.length) {
+          breakingRenderTrack(stories);
+          return;
+        }
+      }
+    } catch {}
   }
+
   try {
-    gnewsSpend();
-    const q   = encodeURIComponent(BREAKING_QUERY);
-    const url = `https://newsdata.io/api/1/news?apikey=${CONFIG.GNEWS_API_KEY}&q=${q}&language=en&size=10`;
-    const r   = await fetch(url);
-    if (!r.ok) throw new Error('GNews error');
-    const d   = await r.json();
-    if (!d.results?.length) throw new Error('No articles');
-    const mapped = d.results.map(a => ({
-      title:       a.title,
-      publishedAt: a.pubDate,
-      source:      { name: a.source_id || '' },
-      url:         a.link,
-    }));
-    breakingRenderTrack(mapped);
+    const today = new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+    const prompt = `Today is ${today}. Search the web for the 8 most important breaking macro finance and geopolitical news stories from the last 24 hours. Focus on: Fed/central banks, inflation data, jobs, GDP, trade wars, geopolitical conflicts, oil/gold, crypto, earnings surprises, debt/credit events.
+
+Return ONLY a JSON array, no markdown:
+[
+  {
+    "title": "Headline here",
+    "summary": "One sentence summary",
+    "source": "Source name",
+    "publishedAt": "2026-03-17T10:00:00Z",
+    "url": "#"
+  }
+]
+Return exactly 8 items. Real headlines only, no fabrication.`;
+
+    const res = await fetch('/.netlify/functions/claude-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'breaking_news', prompt, max_tokens: 1500 }),
+    });
+
+    if (!res.ok) throw new Error('Claude proxy error');
+    const d = await res.json();
+    if (!d.text) throw new Error('No response');
+
+    const stories = JSON.parse(d.text.replace(/```json|```/g, '').trim());
+    if (!Array.isArray(stories) || !stories.length) throw new Error('Invalid response');
+
+    // Cache it
+    try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), stories })); } catch {}
+
+    breakingRenderTrack(stories);
   } catch {
-    // Fallback: use already-loaded news stories from the main news section
+    // Fallback to static stories if Claude fails
     if (breakingStories.length && !forceRefresh) return;
     const fallback = NEWS_STORIES.slice(0, 6).map(s => ({
       title:       s.headline,
@@ -3535,12 +3565,15 @@ async function fillEarningsWithClaude(rows) {
   const today = new Date().toISOString().slice(0,10);
   const needsFill = rows.filter(r => !r.dateStr || (!r.epsAct && r.isPast));
   if (!needsFill.length) return rows;
-  const cacheKey = 'claude_earnings_fill_v2';
+
+  // Cache key based on which tickers need filling — only re-fetches when that changes
+  const cacheKey = 'claude_earnings_fill_v3';
+  const cacheFingerprint = needsFill.map(r => r.ticker + (r.dateStr||'')).sort().join(',');
   try {
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
-      const { date, data } = JSON.parse(cached);
-      if (date === today) return mergeEarningsFill(rows, data);
+      const { fingerprint, data } = JSON.parse(cached);
+      if (fingerprint === cacheFingerprint) return mergeEarningsFill(rows, data);
     }
   } catch {}
   const tickerList = needsFill.map(r => `  "${r.ticker}": "${r.name} (${r.sector})"`).join(',\n');
@@ -3554,7 +3587,7 @@ async function fillEarningsWithClaude(rows) {
     const d = await res.json();
     if (!d.text) return rows;
     const data = JSON.parse(d.text.replace(/```json|```/g,'').trim());
-    try { localStorage.setItem(cacheKey, JSON.stringify({ date: today, data })); } catch {}
+    try { localStorage.setItem(cacheKey, JSON.stringify({ fingerprint: cacheFingerprint, data })); } catch {}
     return mergeEarningsFill(rows, data);
   } catch { return rows; }
 }
