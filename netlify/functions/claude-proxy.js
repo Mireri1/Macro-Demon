@@ -52,6 +52,31 @@ exports.handler = async (event) => {
 
   const { type, prompt, max_tokens = 1000, seriesId, limit } = body;
 
+  // ── Yahoo Finance proxy — avoids browser CORS issues
+  if (type === 'yahoo') {
+    const { ticker } = body;
+    if (!ticker) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing ticker' }) };
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5d`;
+    try {
+      const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      if (!r.ok) return { statusCode: r.status, headers, body: JSON.stringify({ error: 'Yahoo error' }) };
+      const d = await r.json();
+      const meta = d?.chart?.result?.[0]?.meta;
+      if (!meta) return { statusCode: 404, headers, body: JSON.stringify({ error: 'No data' }) };
+      const price = meta.regularMarketPrice ?? meta.previousClose;
+      const prevClose = meta.chartPreviousClose ?? meta.previousClose;
+      if (!price) return { statusCode: 404, headers, body: JSON.stringify({ error: 'No price' }) };
+      return { statusCode: 200, headers, body: JSON.stringify({
+        price: parseFloat(price),
+        prevClose: parseFloat(prevClose),
+        change: price - prevClose,
+        changePct: ((price - prevClose) / prevClose) * 100,
+      })};
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
   // ── FRED proxy — routes FRED API calls server-side to avoid browser CORS
   if (type === 'fred') {
     if (!seriesId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing seriesId' }) };

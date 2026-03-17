@@ -810,8 +810,33 @@ function gv(obs, i = 0) {
 // Yahoo Finance works via corsproxy; Binance has open CORS natively
 // ─────────────────────────────────────────────────────────
 
-// Yahoo Finance via CORS proxy — returns { price, prevClose, change, changePct }
+// Yahoo Finance via Netlify proxy — returns { price, prevClose, change, changePct }
 async function fetchYahoo(ticker) {
+  // Tier 1: Finnhub (no CORS issues, native support)
+  try {
+    const fhSym = YAHOO_TO_FINNHUB[ticker] || ticker;
+    const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(fhSym)}&token=${CONFIG.FINNHUB_API_KEY}`);
+    if (r.ok) {
+      const d = await r.json();
+      if (d.c && d.c !== 0) return { price: d.c, prevClose: d.pc, change: d.d, changePct: d.dp };
+    }
+  } catch {}
+  // Tier 2: Yahoo via Netlify proxy
+  try {
+    const res = await fetch('/.netlify/functions/claude-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'yahoo', ticker }),
+    });
+    if (res.ok) {
+      const d = await res.json();
+      if (d.price) return d;
+    }
+  } catch {}
+  return null;
+}
+
+async function fetchYahoo_unused(ticker) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5d`;
   const proxies = [
     `https://corsproxy.io/?${encodeURIComponent(url)}`,
@@ -2338,18 +2363,7 @@ setTimeout(enrichNewsWithAI, 3000); // Wait for dashboard data to load first
 // ═══════════════════════════════════════════════════════════════
 
 // High-urgency macro keywords — things that actually move markets
-const BREAKING_QUERY = [
-  'Federal Reserve','FOMC','interest rate decision',
-  'inflation CPI','jobs report','GDP','recession',
-  'Treasury yield','debt ceiling',
-  'BRICS','dollar collapse','de-dollarization',
-  'trade war tariff','sanctions',
-  'oil price','OPEC','gold price record',
-  'bank failure','credit crisis',
-  'AI regulation','semiconductor export',
-  'China economy','Japan yen','ECB rate',
-  'war ceasefire','geopolitical risk',
-].join(' OR ');
+const BREAKING_QUERY = 'Federal Reserve OR recession OR trade war OR OPEC OR debt ceiling OR BRICS OR gold price OR AI regulation';
 
 let breakingPaused = false;
 let breakingStories = [];
