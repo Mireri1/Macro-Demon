@@ -2462,8 +2462,15 @@ Return exactly 8 items. Real headlines only, no fabrication.`;
     const d = await res.json();
     if (!d.text) throw new Error('No response');
 
-    const stories = JSON.parse(d.text.replace(/```json|```/g, '').trim());
-    if (!Array.isArray(stories) || !stories.length) throw new Error('Invalid response');
+    const raw = JSON.parse(d.text.replace(/```json|```/g, '').trim());
+    if (!Array.isArray(raw) || !raw.length) throw new Error('Invalid response');
+    // Normalize field names — Claude may return headline or title
+    const stories = raw.map(s => ({
+      title:       s.title || s.headline || '',
+      publishedAt: s.publishedAt || s.pubDate || new Date().toISOString(),
+      source:      { name: s.source || '' },
+      url:         s.url || '#',
+    })).filter(s => s.title);
 
     // Cache it
     try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), stories })); } catch {}
@@ -3613,66 +3620,87 @@ async function loadEarnings() {
   const todayStr = fmt(today);
   const tickers = Object.keys(EARNINGS_WATCHLIST);
 
-  const [avCalendar, ...epsResults] = await Promise.all([
-    fetchAVEarningsCalendar(),
-    ...tickers.slice(0,8).map(t => fetchEpsActual(t)),
-  ]);
-
-  const epsMap = {};
-  tickers.slice(0,8).forEach((t,i) => { if (epsResults[i]?.length) epsMap[t] = epsResults[i]; });
-  for (let i = 8; i < tickers.length; i += 12) {
-    await new Promise(r => setTimeout(r,200));
-    const batch = tickers.slice(i, i+12);
-    const results = await Promise.all(batch.map(t => fetchEpsActual(t)));
-    batch.forEach((t,j) => { if (results[j]?.length) epsMap[t] = results[j]; });
-  }
-
-  const rows = tickers.map(t => {
-    const info = EARNINGS_WATCHLIST[t];
-    const avEntry = avCalendar?.[t] || null;
-    const history = epsMap[t] || [];
-    const latest = history[0] || null;
-    if (avEntry) {
-      const reportDate = avEntry.reportDate;
-      const isToday = reportDate===todayStr, isFuture = reportDate>todayStr, isPast = reportDate<=todayStr;
-      const epsEst = avEntry.estimate ?? latest?.estimate ?? null;
-      const epsAct = isPast ? (latest?.actual??null) : null;
-      const surprise = (epsAct!==null&&epsEst!==null&&epsEst!==0) ? ((epsAct-epsEst)/Math.abs(epsEst))*100 : null;
-      return { ticker:t, ...info, dateStr:reportDate, isPast, isFuture, isToday, epsEst, epsAct, surprise };
+  // Check cache first
+  const CACHE_KEY = 'earnings_claude_v2';
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const { fingerprint, rows } = JSON.parse(cached);
+      if (fingerprint === tickers.join(',') && rows?.length) {
+        renderEarningsRows(rows, today, todayStr);
+        runEarningsAI(rows, {});
+        return;
+      }
     }
-    const dateStr = latest?.period||null;
-    const epsAct = latest?.actual??null, epsEst = latest?.estimate??null;
-    const surprise = (epsAct!==null&&epsEst!==null&&epsEst!==0) ? ((epsAct-epsEst)/Math.abs(epsEst))*100 : null;
-    return { ticker:t, ...info, dateStr, isPast:!!dateStr, isFuture:false, isToday:false, epsEst, epsAct, surprise };
-  }).sort((a,b) => {
+  } catch {}
+
+  const wrap = document.getElementById('earningsTableWrap');
+  if (wrap) wrap.innerHTML = '<div class="earnings-loading">Fetching earnings via AI...</div>';
+
+  const tickerList = tickers.map(t => `  "${t}": "${EARNINGS_WATCHLIST[t].name} (${EARNINGS_WATCHLIST[t].sector})"`).join(',
+');
+  const prompt = `Today is ${todayStr}. Search the web for earnings data for these companies. For each find the most recent quarterly report date and EPS, plus any upcoming scheduled date.
+
+Tickers:
+{
+${tickerList}
+}
+
+Return ONLY this JSON:
+{
+  "AAPL": { "reportDate": "2026-01-30", "fiscalPeriod": "Q4 2025", "epsActual": 2.41, "epsEstimate": 2.35, "isFuture": false }
+}
+isFuture=true if not yet reported. Only include tickers you found data for. Return ONLY valid JSON, no markdown.`;
+
+  try {
+    const res = await fetch('/.netlify/functions/claude-proxy', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'earnings_dates', prompt, max_tokens: 3000 }),
+    });
+    if (!res.ok) throw new Error('proxy error');
+    const d = await res.json();
+    if (!d.text) throw new Error('no text');
+    const data = JSON.parse(d.text.replace(/```json|```/g,'').trim());
+    const rows = tickers.map(t => {
+      const info = EARNINGS_WATCHLIST[t];
+      const e = data[t];
+      if (!e) return { ticker:t, ...info, dateStr:null, isPast:false, isFuture:false, isToday:false, epsEst:null, epsAct:null, surprise:null };
+      const isPast = !e.isFuture && !!e.reportDate && e.reportDate <= todayStr;
+      const isFuture = !!e.isFuture || (!!e.reportDate && e.reportDate > todayStr);
+      const isToday = e.reportDate === todayStr;
+      const surprise = (e.epsActual!=null&&e.epsEstimate!=null&&e.epsEstimate!==0)
+        ? ((e.epsActual-e.epsEstimate)/Math.abs(e.epsEstimate))*100 : null;
+      return { ticker:t, ...info, dateStr:e.reportDate||null, isPast, isFuture, isToday,
+        epsEst:e.epsEstimate??null, epsAct:e.epsActual??null, surprise };
+    });
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ fingerprint: tickers.join(','), rows })); } catch {}
+    renderEarningsRows(rows, today, todayStr);
+    runEarningsAI(rows, {});
+  } catch {
+    if (wrap) wrap.innerHTML = '<div class="earnings-loading">Earnings unavailable — will retry.</div>';
+  }
+}
+
+function renderEarningsRows(rows, today, todayStr) {
+  rows.sort((a,b) => {
     if (a.isFuture&&!b.isFuture) return -1; if (!a.isFuture&&b.isFuture) return 1;
     if (a.isFuture&&b.isFuture) return (a.dateStr||'').localeCompare(b.dateStr||'');
     if (a.isPast&&b.isPast) return (b.dateStr||'').localeCompare(a.dateStr||'');
     return 0;
   });
-
-  const filledRows = await fillEarningsWithClaude(rows);
-  filledRows.sort((a,b) => {
-    if (a.isFuture&&!b.isFuture) return -1; if (!a.isFuture&&b.isFuture) return 1;
-    if (a.isFuture&&b.isFuture) return (a.dateStr||'').localeCompare(b.dateStr||'');
-    if (a.isPast&&b.isPast) return (b.dateStr||'').localeCompare(a.dateStr||'');
-    return 0;
-  });
-
   const fmtEps = v => v!==null&&!isNaN(v) ? (v>=0?'+':'')+v.toFixed(2) : '—';
   const tableHTML = `<table class="earnings-table"><thead><tr>
     <th>Company</th><th>Sector</th><th>Date</th><th class="r">EPS Est.</th><th class="r">EPS Act.</th><th class="r">Surprise</th>
   </tr></thead><tbody>
-  ${filledRows.slice(0,20).map(r => {
+  ${rows.slice(0,20).map(r => {
     const sc = SECTOR_COLORS[r.sector]||'var(--blue)';
-    const tomorrow = new Date(today); tomorrow.setDate(today.getDate()+1);
     let dateBadge = r.isToday ? '<span class="e-date-badge today">TODAY</span>'
       : r.dateStr ? `<span class="e-date-badge ${r.isFuture?'tomorrow':'past'}">${r.dateStr.slice(5)}</span>` : '';
     let statusCell, surpriseCell;
     if (r.isFuture) { statusCell='<span class="e-upcoming">UPCOMING</span>'; surpriseCell='—'; }
     else if (r.surprise!==null) {
-      const cls = r.surprise>2?'e-beat':r.surprise<-2?'e-miss':'e-inline';
-      const lbl = r.surprise>2?'BEAT':r.surprise<-2?'MISS':'IN-LINE';
+      const cls=r.surprise>2?'e-beat':r.surprise<-2?'e-miss':'e-inline';
+      const lbl=r.surprise>2?'BEAT':r.surprise<-2?'MISS':'IN-LINE';
       statusCell=`<span class="${cls}">${lbl}</span>`;
       surpriseCell=`<span class="e-surprise ${r.surprise>0?'pos':r.surprise<0?'neg':'neu'}">${r.surprise>0?'+':''}${r.surprise.toFixed(1)}%</span>`;
     } else { statusCell='<span class="e-upcoming">UPCOMING</span>'; surpriseCell='—'; }
@@ -3681,14 +3709,12 @@ async function loadEarnings() {
       <td>${dateBadge}</td><td class="e-val">${fmtEps(r.epsEst)}</td>
       <td class="e-val">${fmtEps(r.epsAct)}</td><td class="e-val">${surpriseCell}</td></tr>`;
   }).join('')}</tbody></table>`;
-
   const wrap = document.getElementById('earningsTableWrap');
   if (wrap) wrap.innerHTML = tableHTML;
   const seasonEl = document.getElementById('earningsSeasonLabel');
   const m = today.getMonth()+1;
   if (seasonEl) seasonEl.textContent = m<=2?'Q4 Season':m<=5?'Q1 Season':m<=8?'Q2 Season':'Q3 Season';
-  renderEarningsSectors(filledRows);
-  runEarningsAI(filledRows, {});
+  renderEarningsSectors(rows);
 }
 
 function renderEarningsSectors(rows) {
