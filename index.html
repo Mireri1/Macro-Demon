@@ -741,7 +741,8 @@ const USE_DEMO = CONFIG.FRED_API_KEY === 'YOUR_FRED_API_KEY';
 // ─────────────────────────────────────────────────────────
 async function fetchFRED(seriesId, limit = 26) {
   if (USE_DEMO) return null;
-  const base = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${CONFIG.FRED_API_KEY}&file_type=json&sort_order=desc&limit=${limit}`;
+  const fredUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${CONFIG.FRED_API_KEY}&file_type=json&sort_order=desc&limit=${limit}`;
+  const base = `https://corsproxy.io/?${encodeURIComponent(fredUrl)}`;
   const proxies = [
     base,
     `https://corsproxy.io/?${encodeURIComponent(base)}`,
@@ -1239,8 +1240,13 @@ async function loadLiquidity() {
       return { val, prev, date: today };
     }
     if (d.finnhubSym) {
-      const fh = await fetchFinnhubQuote(d.finnhubSym);
-      if (fh?.price) return { val: fh.price, prev: fh.prevClose, date: today };
+      try {
+        const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(d.finnhubSym)}&token=${CONFIG.FINNHUB_API_KEY}`);
+        if (r.ok) {
+          const fh = await r.json();
+          if (fh.c && fh.c !== 0) return { val: fh.c, prev: fh.pc, date: today };
+        }
+      } catch {}
     }
     const fredD = await getFRED(d.fredId, 'level', 5);
     if (fredD?.val) return fredD;
