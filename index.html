@@ -520,6 +520,32 @@ footer{border-top:1px solid var(--border);padding-top:18px;display:flex;justify-
 </div>
 
 
+<!-- EARNINGS SECTION -->
+<div class="sec-head sec-earnings" style="margin-top:10px;">Earnings — Season Tracker</div>
+
+<div class="ai-card" id="earningsAiCard" style="margin-bottom:8px;display:none;">
+  <div style="font-size:9px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:10px;">
+    <span style="display:inline-block;width:3px;height:12px;background:var(--col-earnings);flex-shrink:0;"></span>
+    EARNINGS AI ANALYSIS
+    <span id="earningsAiTimestamp" style="color:var(--text-dim);font-size:8px;"></span>
+  </div>
+  <div class="ai-text loading" id="earningsAiText" style="font-size:13px;line-height:1.8;white-space:pre-wrap;">Analyzing earnings data...</div>
+</div>
+
+<div class="earnings-sector-grid" id="earningsSectorGrid">
+  <div class="earnings-loading">Loading sector beat rates...</div>
+</div>
+<div class="earnings-layout" style="margin-top:2px;">
+  <div class="earnings-panel">
+    <div class="earnings-panel-title">Key Earnings — Recent &amp; Upcoming <span id="earningsSeasonLabel"></span></div>
+    <div id="earningsTableWrap"><div class="earnings-loading">Loading earnings...</div></div>
+  </div>
+  <div class="earnings-panel">
+    <div class="earnings-panel-title">Sector Breakdown <span style="color:var(--text-dim);font-size:8px;">beat rate vs estimate</span></div>
+    <div id="earningsSectorDetail"><div class="earnings-loading">Loading sector data...</div></div>
+  </div>
+</div>
+
 <!-- MULTI-ASSET PERFORMANCE CHART -->
 <div class="chart-panel">
   <div class="chart-top">
@@ -2373,7 +2399,7 @@ function breakingRenderTrack(stories) {
   }
 
   // Flash the BREAKING label red if any story is < 2hr old
-  const hasBreaking = stories.some(s => (Date.now() - new Date(s.publishedAt).getTime()) < 120*60000);
+  const hasBreaking = stories.some(s => (Date.now() - new Date(s.publishedAt || s.pubDate).getTime()) < 120*60000);
   const label = document.querySelector('.breaking-label');
   if (label) label.style.background = hasBreaking ? 'var(--red)' : 'var(--accent)';
 }
@@ -2392,7 +2418,13 @@ async function loadBreakingNews(forceRefresh = false) {
     if (!r.ok) throw new Error('GNews error');
     const d   = await r.json();
     if (!d.results?.length) throw new Error('No articles');
-    breakingRenderTrack(d.results);
+    const mapped = d.results.map(a => ({
+      title:       a.title,
+      publishedAt: a.pubDate,
+      source:      { name: a.source_id || '' },
+      url:         a.link,
+    }));
+    breakingRenderTrack(mapped);
   } catch {
     // Fallback: use already-loaded news stories from the main news section
     if (breakingStories.length && !forceRefresh) return;
@@ -2438,6 +2470,7 @@ async function refreshAll() {
     `<span class="live-dot"></span>${new Date().toLocaleTimeString()}${mode}`;
 }
 
+loadEarnings();
 refreshAll();
 setInterval(refreshAll, 5 * 60 * 1000);
 
@@ -3425,6 +3458,241 @@ async function tcLoad() {
 
 window.addEventListener('resize',()=>{ tcSyncSizes(); tcDraw(); tcInitOverlay(); });
 setTimeout(tcLoad, 300);
+
+
+// ─────────────────────────────────────────────────────────
+// EARNINGS WATCHLIST
+// ─────────────────────────────────────────────────────────
+const EARNINGS_WATCHLIST = {
+  AAPL:  { name:'Apple',            sector:'Technology',      mc:3.5  },
+  MSFT:  { name:'Microsoft',        sector:'Technology',      mc:3.1  },
+  NVDA:  { name:'Nvidia',           sector:'Technology',      mc:3.0  },
+  GOOGL: { name:'Alphabet',         sector:'Technology',      mc:2.1  },
+  META:  { name:'Meta',             sector:'Technology',      mc:1.5  },
+  AMZN:  { name:'Amazon',           sector:'Technology',      mc:2.3  },
+  JPM:   { name:'JPMorgan Chase',   sector:'Financials',      mc:0.7  },
+  BAC:   { name:'Bank of America',  sector:'Financials',      mc:0.35 },
+  GS:    { name:'Goldman Sachs',    sector:'Financials',      mc:0.18 },
+  MS:    { name:'Morgan Stanley',   sector:'Financials',      mc:0.16 },
+  JNJ:   { name:'Johnson & Johnson',sector:'Healthcare',      mc:0.39 },
+  UNH:   { name:'UnitedHealth',     sector:'Healthcare',      mc:0.45 },
+  LLY:   { name:'Eli Lilly',        sector:'Healthcare',      mc:0.73 },
+  XOM:   { name:'ExxonMobil',       sector:'Energy',          mc:0.52 },
+  CVX:   { name:'Chevron',          sector:'Energy',          mc:0.28 },
+  TSLA:  { name:'Tesla',            sector:'Consumer Disc.',  mc:0.85 },
+  WMT:   { name:'Walmart',          sector:'Consumer Staples',mc:0.78 },
+  COST:  { name:'Costco',           sector:'Consumer Staples',mc:0.38 },
+  CAT:   { name:'Caterpillar',      sector:'Industrials',     mc:0.19 },
+  NFLX:  { name:'Netflix',          sector:'Comm. Services',  mc:0.40 },
+};
+
+const SECTOR_COLORS = {
+  'Technology':'#58a6ff','Financials':'#3fb950','Healthcare':'#bc8cff',
+  'Energy':'#e3894b','Consumer Disc.':'#d29922','Consumer Staples':'#f7931a',
+  'Industrials':'#58a6ff','Comm. Services':'#bc8cff',
+};
+
+async function fetchAVEarningsCalendar() {
+  try {
+    const url = `https://www.alphavantage.co/query?function=EARNINGS_CALENDAR&horizon=3month&apikey=${CONFIG.ALPHA_VANTAGE_KEY}`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!r.ok) return null;
+    const text = await r.text();
+    const lines = text.trim().split('\n').slice(1);
+    const map = {};
+    for (const line of lines) {
+      const [symbol,,reportDate,,estimate] = line.split(',');
+      if (symbol && reportDate) map[symbol] = { reportDate, estimate: parseFloat(estimate) || null };
+    }
+    return Object.keys(map).length ? map : null;
+  } catch { return null; }
+}
+
+async function fetchEpsActual(ticker) {
+  try {
+    const r = await fetch(`https://finnhub.io/api/v1/stock/earnings?symbol=${ticker}&token=${CONFIG.FINNHUB_API_KEY}`);
+    if (!r.ok) return [];
+    const d = await r.json();
+    return Array.isArray(d) ? d : [];
+  } catch { return []; }
+}
+
+async function fillEarningsWithClaude(rows) {
+  const today = new Date().toISOString().slice(0,10);
+  const needsFill = rows.filter(r => !r.dateStr || (!r.epsAct && r.isPast));
+  if (!needsFill.length) return rows;
+  const cacheKey = 'claude_earnings_fill_v2';
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const { date, data } = JSON.parse(cached);
+      if (date === today) return mergeEarningsFill(rows, data);
+    }
+  } catch {}
+  const tickerList = needsFill.map(r => `  "${r.ticker}": "${r.name} (${r.sector})"`).join(',\n');
+  const prompt = `Today is ${today}. Search the web for the most recent quarterly earnings for each company. Return ONLY JSON:\n{\n${tickerList}\n}\nFormat: { "AAPL": { "reportDate": "2026-01-30", "fiscalPeriod": "Q4 2025", "epsActual": 2.41, "epsEstimate": 2.35 } }\nOnly include tickers you found real data for. Return ONLY valid JSON.`;
+  try {
+    const res = await fetch('/.netlify/functions/claude-proxy', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'earnings_dates', prompt, max_tokens: 2000 }),
+    });
+    if (!res.ok) return rows;
+    const d = await res.json();
+    if (!d.text) return rows;
+    const data = JSON.parse(d.text.replace(/```json|```/g,'').trim());
+    try { localStorage.setItem(cacheKey, JSON.stringify({ date: today, data })); } catch {}
+    return mergeEarningsFill(rows, data);
+  } catch { return rows; }
+}
+
+function mergeEarningsFill(rows, data) {
+  return rows.map(r => {
+    const fill = data[r.ticker];
+    if (!fill) return r;
+    const today = new Date().toISOString().slice(0,10);
+    const reportDate = fill.reportDate || r.dateStr;
+    const isPast = !!reportDate && reportDate <= today;
+    return { ...r, dateStr: reportDate||r.dateStr, isPast, isFuture: !!reportDate&&reportDate>today,
+      isToday: reportDate===today, epsAct: fill.epsActual??r.epsAct, epsEst: fill.epsEstimate??r.epsEst,
+      surprise: (fill.epsActual!=null&&fill.epsEstimate!=null&&fill.epsEstimate!==0)
+        ? ((fill.epsActual-fill.epsEstimate)/Math.abs(fill.epsEstimate))*100 : r.surprise };
+  });
+}
+
+async function loadEarnings() {
+  const today = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const todayStr = fmt(today);
+  const tickers = Object.keys(EARNINGS_WATCHLIST);
+
+  const [avCalendar, ...epsResults] = await Promise.all([
+    fetchAVEarningsCalendar(),
+    ...tickers.slice(0,8).map(t => fetchEpsActual(t)),
+  ]);
+
+  const epsMap = {};
+  tickers.slice(0,8).forEach((t,i) => { if (epsResults[i]?.length) epsMap[t] = epsResults[i]; });
+  for (let i = 8; i < tickers.length; i += 12) {
+    await new Promise(r => setTimeout(r,200));
+    const batch = tickers.slice(i, i+12);
+    const results = await Promise.all(batch.map(t => fetchEpsActual(t)));
+    batch.forEach((t,j) => { if (results[j]?.length) epsMap[t] = results[j]; });
+  }
+
+  const rows = tickers.map(t => {
+    const info = EARNINGS_WATCHLIST[t];
+    const avEntry = avCalendar?.[t] || null;
+    const history = epsMap[t] || [];
+    const latest = history[0] || null;
+    if (avEntry) {
+      const reportDate = avEntry.reportDate;
+      const isToday = reportDate===todayStr, isFuture = reportDate>todayStr, isPast = reportDate<=todayStr;
+      const epsEst = avEntry.estimate ?? latest?.estimate ?? null;
+      const epsAct = isPast ? (latest?.actual??null) : null;
+      const surprise = (epsAct!==null&&epsEst!==null&&epsEst!==0) ? ((epsAct-epsEst)/Math.abs(epsEst))*100 : null;
+      return { ticker:t, ...info, dateStr:reportDate, isPast, isFuture, isToday, epsEst, epsAct, surprise };
+    }
+    const dateStr = latest?.period||null;
+    const epsAct = latest?.actual??null, epsEst = latest?.estimate??null;
+    const surprise = (epsAct!==null&&epsEst!==null&&epsEst!==0) ? ((epsAct-epsEst)/Math.abs(epsEst))*100 : null;
+    return { ticker:t, ...info, dateStr, isPast:!!dateStr, isFuture:false, isToday:false, epsEst, epsAct, surprise };
+  }).sort((a,b) => {
+    if (a.isFuture&&!b.isFuture) return -1; if (!a.isFuture&&b.isFuture) return 1;
+    if (a.isFuture&&b.isFuture) return (a.dateStr||'').localeCompare(b.dateStr||'');
+    if (a.isPast&&b.isPast) return (b.dateStr||'').localeCompare(a.dateStr||'');
+    return 0;
+  });
+
+  const filledRows = await fillEarningsWithClaude(rows);
+  filledRows.sort((a,b) => {
+    if (a.isFuture&&!b.isFuture) return -1; if (!a.isFuture&&b.isFuture) return 1;
+    if (a.isFuture&&b.isFuture) return (a.dateStr||'').localeCompare(b.dateStr||'');
+    if (a.isPast&&b.isPast) return (b.dateStr||'').localeCompare(a.dateStr||'');
+    return 0;
+  });
+
+  const fmtEps = v => v!==null&&!isNaN(v) ? (v>=0?'+':'')+v.toFixed(2) : '—';
+  const tableHTML = `<table class="earnings-table"><thead><tr>
+    <th>Company</th><th>Sector</th><th>Date</th><th class="r">EPS Est.</th><th class="r">EPS Act.</th><th class="r">Surprise</th>
+  </tr></thead><tbody>
+  ${filledRows.slice(0,20).map(r => {
+    const sc = SECTOR_COLORS[r.sector]||'var(--blue)';
+    const tomorrow = new Date(today); tomorrow.setDate(today.getDate()+1);
+    let dateBadge = r.isToday ? '<span class="e-date-badge today">TODAY</span>'
+      : r.dateStr ? `<span class="e-date-badge ${r.isFuture?'tomorrow':'past'}">${r.dateStr.slice(5)}</span>` : '';
+    let statusCell, surpriseCell;
+    if (r.isFuture) { statusCell='<span class="e-upcoming">UPCOMING</span>'; surpriseCell='—'; }
+    else if (r.surprise!==null) {
+      const cls = r.surprise>2?'e-beat':r.surprise<-2?'e-miss':'e-inline';
+      const lbl = r.surprise>2?'BEAT':r.surprise<-2?'MISS':'IN-LINE';
+      statusCell=`<span class="${cls}">${lbl}</span>`;
+      surpriseCell=`<span class="e-surprise ${r.surprise>0?'pos':r.surprise<0?'neg':'neu'}">${r.surprise>0?'+':''}${r.surprise.toFixed(1)}%</span>`;
+    } else { statusCell='<span class="e-upcoming">UPCOMING</span>'; surpriseCell='—'; }
+    return `<tr><td><div class="e-ticker">${r.ticker}</div><div class="e-name">${r.name}</div></td>
+      <td><span class="e-sector-tag" style="background:${sc}18;color:${sc}">${r.sector}</span></td>
+      <td>${dateBadge}</td><td class="e-val">${fmtEps(r.epsEst)}</td>
+      <td class="e-val">${fmtEps(r.epsAct)}</td><td class="e-val">${surpriseCell}</td></tr>`;
+  }).join('')}</tbody></table>`;
+
+  const wrap = document.getElementById('earningsTableWrap');
+  if (wrap) wrap.innerHTML = tableHTML;
+  const seasonEl = document.getElementById('earningsSeasonLabel');
+  const m = today.getMonth()+1;
+  if (seasonEl) seasonEl.textContent = m<=2?'Q4 Season':m<=5?'Q1 Season':m<=8?'Q2 Season':'Q3 Season';
+  renderEarningsSectors(filledRows);
+  runEarningsAI(filledRows, {});
+}
+
+function renderEarningsSectors(rows) {
+  const sectors = {};
+  rows.forEach(r => {
+    if (r.epsAct===null) return;
+    if (!sectors[r.sector]) sectors[r.sector]={beats:0,misses:0,inline:0,total:0,surprises:[]};
+    const s=sectors[r.sector]; s.total++;
+    if (r.surprise!==null) {
+      s.surprises.push(r.surprise);
+      if (r.surprise>2) s.beats++; else if (r.surprise<-2) s.misses++; else s.inline++;
+    }
+  });
+  const gridEl = document.getElementById('earningsSectorGrid');
+  if (gridEl) gridEl.innerHTML = Object.entries(sectors).map(([name,d]) => {
+    const br = Math.round(d.beats/d.total*100);
+    const color = SECTOR_COLORS[name]||'var(--blue)';
+    return `<div class="e-sector-card"><div class="e-sector-name">${name}</div>
+      <div class="e-sector-beat-rate" style="color:${color}">${br}%</div>
+      <div class="e-sector-sub"><span class="pos">▲${d.beats}</span><span class="neg">▼${d.misses}</span><span>${d.inline} inline</span></div></div>`;
+  }).join('');
+  return sectors;
+}
+
+async function runEarningsAI(rows, sectors) {
+  const card = document.getElementById('earningsAiCard');
+  const el = document.getElementById('earningsAiText');
+  if (!card||!el) return;
+  card.style.display='block'; el.className='ai-text loading';
+  el.textContent='Analyzing earnings data...';
+  const reported = rows.filter(r=>r.isPast&&r.surprise!==null);
+  const upcoming = rows.filter(r=>r.isFuture);
+  const totalReported=reported.length, totalBeats=reported.filter(r=>r.surprise>2).length;
+  const totalMisses=reported.filter(r=>r.surprise<-2).length;
+  const overallBeatRate=totalReported?Math.round(totalBeats/totalReported*100):null;
+  const avgSurprise=reported.length?(reported.reduce((s,r)=>s+r.surprise,0)/reported.length).toFixed(1):null;
+  const prompt = `You are a senior equity strategist. Today is ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}.
+EARNINGS: ${totalReported} reported, ${overallBeatRate}% beat rate, avg surprise ${avgSurprise}%.
+UPCOMING: ${upcoming.slice(0,5).map(r=>`${r.ticker} (${r.dateStr||'TBD'})`).join(', ')}
+Write 2 tight paragraphs. No markdown. Paragraph 1: verdict on beat rate and standout sector divergences. Paragraph 2: forward watch — 1-2 upcoming reports with most macro signal.`;
+  const res = await fetch('/.netlify/functions/claude-proxy', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ type:'earnings_analysis', prompt, max_tokens:500 }),
+  });
+  if (res.ok) {
+    const d = await res.json();
+    if (d.text) { el.className='ai-text'; el.textContent=d.text; return; }
+  }
+  el.className='ai-text';
+  el.textContent = totalReported ? `${totalReported} companies reported. Beat rate: ${overallBeatRate}%. Avg surprise: ${avgSurprise}%.` : 'No earnings data yet.';
+}
 
 </script>
 </body>

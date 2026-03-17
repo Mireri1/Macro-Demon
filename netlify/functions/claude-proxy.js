@@ -72,6 +72,8 @@ exports.handler = async (event) => {
   }
 
   const systemMap = {
+    earnings_dates:    'You are a financial data assistant. Search the web for real earnings data. Return only valid JSON, no markdown.',
+    earnings_analysis: 'You are a senior equity strategist. Write compressed, high-signal earnings analysis. No markdown, no preamble.',
     ai_signal:     'You are a synthesis of Ray Dalio, Stan Druckenmiller, George Soros, Paul Tudor Jones, and Howard Marks. Write compressed, high-signal macro analysis. Be direct and actionable. No preamble.',
     news_classify: 'You are a macro trading desk analyst. Classify headlines by market impact. Return only valid JSON, no markdown.',
     news_enrich:   'You are a macro trading desk analyst. Give brief actionable trading insights. Return only valid JSON, no markdown.',
