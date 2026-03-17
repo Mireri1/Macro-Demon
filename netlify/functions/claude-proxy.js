@@ -127,6 +127,7 @@ exports.handler = async (event) => {
         max_tokens: safeTokens,
         system,
         messages: [{ role: 'user', content: safePrompt }],
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
       }),
     });
 
@@ -137,7 +138,9 @@ exports.handler = async (event) => {
     }
 
     const data = await response.json();
-    const text = data.content?.[0]?.text || '';
+    // Web search returns multiple content blocks — find the last text block
+    const textBlock = (data.content || []).filter(b => b.type === 'text').pop();
+    const text = textBlock?.text || '';
     console.log(`[${type}] ip=${ip} tokens_in=${data.usage?.input_tokens} tokens_out=${data.usage?.output_tokens}`);
 
     return { statusCode: 200, headers, body: JSON.stringify({ text }) };
