@@ -50,7 +50,23 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid request' }) };
   }
 
-  const { type, prompt, max_tokens = 1000 } = body;
+  const { type, prompt, max_tokens = 1000, seriesId, limit } = body;
+
+  // ── FRED proxy — routes FRED API calls server-side to avoid browser CORS
+  if (type === 'fred') {
+    if (!seriesId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing seriesId' }) };
+    const FRED_KEY = 'b0a6e25d3c3e7ce883de9c27dfbbb5e4';
+    const fredUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${FRED_KEY}&file_type=json&sort_order=desc&limit=${limit || 26}`;
+    try {
+      const r = await fetch(fredUrl);
+      if (!r.ok) return { statusCode: r.status, headers, body: JSON.stringify({ error: 'FRED error' }) };
+      const d = await r.json();
+      return { statusCode: 200, headers, body: JSON.stringify(d) };
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
   if (!prompt || !type) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing prompt or type' }) };
   }
