@@ -1208,18 +1208,43 @@ async function loadLiquidity() {
   });
 
   const fxDefs = [
-    { key:'JPYUSD',  cat:'CARRY TRADE',  name:'JPY / USD',    yahooTicker:'USDJPY=X',  fredId:'DEXJPUS',  unit:'¥/$',     sigKey:'JPYUSD',  invert:true  },
-    { key:'EURUSD',  cat:'CURRENCY',     name:'EUR / USD',    yahooTicker:'EURUSD=X',  fredId:'DEXUSEU',  unit:'EUR/USD', sigKey:'EURUSD',  invert:false },
-    { key:'CNYUSD',  cat:'CHINA RISK',   name:'CNY / USD',    yahooTicker:'USDCNY=X',  fredId:'DEXCHUS',  unit:'CNY/$',   sigKey:'CNYUSD',  invert:true  },
-    { key:'AUDUSD',  cat:'RISK PROXY',   name:'AUD / USD',    yahooTicker:'AUDUSD=X',  fredId:'DEXUSAL',  unit:'AUD/USD', sigKey:'AUDUSD',  invert:false },
-    { key:'DXY',     cat:'USD INDEX',    name:'DXY (Broad $)',yahooTicker:'DX-Y.NYB',  fredId:'DTWEXBGS', unit:'idx',     sigKey:'DXY',     invert:true  },
+    { key:'JPYUSD',  cat:'CARRY TRADE',  name:'JPY / USD',    frankfurter:'JPY', finnhubSym:'OANDA:USD_JPY',  fredId:'DEXJPUS',  unit:'¥/$',     sigKey:'JPYUSD',  invert:true  },
+    { key:'EURUSD',  cat:'CURRENCY',     name:'EUR / USD',    frankfurter:'EUR', finnhubSym:'OANDA:EUR_USD',  fredId:'DEXUSEU',  unit:'EUR/USD', sigKey:'EURUSD',  invert:false },
+    { key:'CNYUSD',  cat:'CHINA RISK',   name:'CNY / USD',    frankfurter:'CNY', finnhubSym:'OANDA:USD_CNH',  fredId:'DEXCHUS',  unit:'CNY/$',   sigKey:'CNYUSD',  invert:true  },
+    { key:'AUDUSD',  cat:'RISK PROXY',   name:'AUD / USD',    frankfurter:'AUD', finnhubSym:'OANDA:AUD_USD',  fredId:'DEXUSAL',  unit:'AUD/USD', sigKey:'AUDUSD',  invert:false },
+    { key:'DXY',     cat:'USD INDEX',    name:'DXY (Broad $)',frankfurter:null,  finnhubSym:'FOREXCOM:DXY',   fredId:'DTWEXBGS', unit:'idx',     sigKey:'DXY',     invert:true  },
   ];
 
+  let frankfurterRates = {};
+  try {
+    const fxSymbols = fxDefs.filter(d => d.frankfurter).map(d => d.frankfurter).join(',');
+    const r = await fetch(`https://api.frankfurter.app/latest?from=USD&to=${fxSymbols}`, { signal: AbortSignal.timeout(6000) });
+    if (r.ok) { const d = await r.json(); frankfurterRates = d.rates || {}; }
+  } catch {}
+
+  let frankfurterPrev = {};
+  try {
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0,10);
+    const fxSymbols = fxDefs.filter(d => d.frankfurter).map(d => d.frankfurter).join(',');
+    const r = await fetch(`https://api.frankfurter.app/${yesterday}?from=USD&to=${fxSymbols}`, { signal: AbortSignal.timeout(6000) });
+    if (r.ok) { const d = await r.json(); frankfurterPrev = d.rates || {}; }
+  } catch {}
+
   const fxResults = await Promise.all(fxDefs.map(async d => {
-    const yahooD = await fetchYahoo(d.yahooTicker);
-    if (yahooD?.price) return { val: yahooD.price, prev: yahooD.prevClose, date: new Date().toISOString().slice(0,10) };
+    const today = new Date().toISOString().slice(0,10);
+    if (d.frankfurter && frankfurterRates[d.frankfurter]) {
+      let val = frankfurterRates[d.frankfurter];
+      let prev = frankfurterPrev[d.frankfurter] || null;
+      if (d.key === 'EURUSD' || d.key === 'AUDUSD') { val = val ? 1/val : null; prev = prev ? 1/prev : null; }
+      return { val, prev, date: today };
+    }
+    if (d.finnhubSym) {
+      const fh = await fetchFinnhubQuote(d.finnhubSym);
+      if (fh?.price) return { val: fh.price, prev: fh.prevClose, date: today };
+    }
     const fredD = await getFRED(d.fredId, 'level', 5);
     if (fredD?.val) return fredD;
+    demoUsed.add(d.key);
     return { val: DEMO[d.key].val, prev: DEMO[d.key].prev, date: DEMO[d.key].date };
   }));
 
