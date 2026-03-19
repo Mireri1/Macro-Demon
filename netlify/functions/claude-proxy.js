@@ -190,9 +190,7 @@ exports.handler = async (event) => {
   }
 
   const systemMap = {
-    breaking_news:     'You are a financial news analyst. Search the web for real breaking macro news. Return only valid JSON arrays, no markdown.',
-    earnings_dates:    'You are a financial data assistant. Search the web for real earnings data. Return only valid JSON, no markdown.',
-    earnings_analysis: 'You are a senior equity strategist. Write compressed, high-signal earnings analysis. No markdown, no preamble.',
+    breaking_news: 'You are a financial news analyst. Search the web for real breaking macro news. Return only valid JSON arrays, no markdown.',
     ai_signal:     'You are a synthesis of Ray Dalio, Stan Druckenmiller, George Soros, Paul Tudor Jones, and Howard Marks. Write compressed, high-signal macro analysis. Be direct and actionable. No preamble.',
     news_classify: 'You are a macro trading desk analyst. Classify headlines by market impact. Return only valid JSON, no markdown.',
     news_enrich:   'You are a macro trading desk analyst. Give brief actionable trading insights. Return only valid JSON, no markdown.',
@@ -203,7 +201,7 @@ exports.handler = async (event) => {
   // breaking_news and earnings_dates need live web search for real-time data
   // All other types receive their data in the prompt — no search needed
   // Haiku handles both well: factual lookups (earnings/news) and text analysis (ai_signal etc.)
-  const SEARCH_TYPES = new Set(['breaking_news', 'earnings_dates']);
+  const SEARCH_TYPES = new Set(['breaking_news']);
   const useSearch = SEARCH_TYPES.has(type);
   const model = 'claude-haiku-4-5';
   const tokenCap = useSearch ? 1500 : 800;
