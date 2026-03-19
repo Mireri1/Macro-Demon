@@ -168,14 +168,6 @@ footer{border-top:1px solid var(--border);padding-top:18px;display:flex;justify-
 .impact-neutral{background:rgba(88,166,255,.12);color:var(--blue);}
 .impact-watch{background:rgba(210,153,34,.12);color:var(--yellow);}
 .news-loading{color:var(--text-dim);font-style:italic;font-size:12px;padding:20px 0;text-align:center;}
-.news-ticker{overflow:hidden;border-bottom:1px solid var(--border);background:rgba(188,140,255,.04);padding:7px 0;margin-bottom:0;}
-.news-ticker-inner{display:flex;gap:0;animation:ticker 40s linear infinite;white-space:nowrap;}
-.news-ticker-inner:hover{animation-play-state:paused;}
-.news-ticker-item{font-size:10px;letter-spacing:.5px;padding:0 28px;color:var(--text-dim);border-right:1px solid var(--border);flex-shrink:0;}
-.news-ticker-item span{color:var(--text);}
-.news-ticker-item.bull span{color:var(--green);}
-.news-ticker-item.bear span{color:var(--red);}
-@keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 
 @media(max-width:768px){
   .two-col{grid-template-columns:1fr;}
@@ -453,24 +445,6 @@ footer{border-top:1px solid var(--border);padding-top:18px;display:flex;justify-
 
 <!-- NEWS SECTION -->
 <div class="news-panel">
-  <div class="news-ticker">
-    <div class="news-ticker-inner" id="newsTicker">
-      <div class="news-ticker-item bull">FED WATCH <span>Next FOMC: Mar 18–19 · Markets pricing 1 cut in 2025</span></div>
-      <div class="news-ticker-item bear">BRICS <span>New payment rails bypassing SWIFT now operational in 6 members</span></div>
-      <div class="news-ticker-item neutral">AI CAPEX <span>Big Tech committed $300B+ in AI infrastructure spend for 2025</span></div>
-      <div class="news-ticker-item bear">TRADE <span>US tariffs on China 145% · EU retaliation measures in progress</span></div>
-      <div class="news-ticker-item bull">GOLD <span>Central bank buying at 55-year high · $3,000/oz psychological level breached</span></div>
-      <div class="news-ticker-item neutral">ENERGY <span>OPEC+ holding cuts through Q2 · Brent crude $73–78 range</span></div>
-      <div class="news-ticker-item bear">DEBT <span>US debt ceiling standoff · Treasury X-date estimated mid-2025</span></div>
-      <div class="news-ticker-item bull">FED WATCH <span>Next FOMC: Mar 18–19 · Markets pricing 1 cut in 2025</span></div>
-      <div class="news-ticker-item bear">BRICS <span>New payment rails bypassing SWIFT now operational in 6 members</span></div>
-      <div class="news-ticker-item neutral">AI CAPEX <span>Big Tech committed $300B+ in AI infrastructure spend for 2025</span></div>
-      <div class="news-ticker-item bear">TRADE <span>US tariffs on China 145% · EU retaliation measures in progress</span></div>
-      <div class="news-ticker-item bull">GOLD <span>Central bank buying at 55-year high · $3,000/oz psychological level breached</span></div>
-      <div class="news-ticker-item neutral">ENERGY <span>OPEC+ holding cuts through Q2 · Brent crude $73–78 range</span></div>
-      <div class="news-ticker-item bear">DEBT <span>US debt ceiling standoff · Treasury X-date estimated mid-2025</span></div>
-    </div>
-  </div>
   <div class="news-tabs">
     <button class="news-tab active" onclick="showTab('all',this)">All Stories</button>
     <button class="news-tab" onclick="showTab('fed',this)">Fed &amp; Rates</button>
