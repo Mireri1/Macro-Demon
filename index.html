@@ -3672,9 +3672,8 @@ async function loadEarnings() {
   const todayStr = fmt(today);
   const tickers = Object.keys(EARNINGS_WATCHLIST);
 
-  // Cache for 7 days — earnings rarely change mid-quarter.
-  // Auto-invalidate when any cached "upcoming" date has now passed (new results available).
-  const CACHE_KEY = 'earnings_yahoo_v1';
+  // Cache 7 days — auto-invalidate when any upcoming date passes
+  const CACHE_KEY = 'earnings_direct_v1';
   const CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
   try {
     const cached = localStorage.getItem(CACHE_KEY);
@@ -3692,33 +3691,39 @@ async function loadEarnings() {
   const wrap = document.getElementById('earningsTableWrap');
   if (wrap) wrap.innerHTML = '<div class="earnings-loading">Loading earnings data...</div>';
 
-  // Single batch call — Netlify fetches all tickers in parallel server-side, 1 roundtrip
-  let data = {};
-  try {
-    const res = await fetch('/.netlify/functions/claude-proxy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'yahoo_earnings_batch', tickers }),
-    });
-    if (res.ok) data = await res.json();
-  } catch {}
+  // All browser-direct — no Netlify proxy, no timeout risk
+  // Alpha Vantage: 1 call for all upcoming dates + estimates
+  // Finnhub: parallel calls for past EPS actuals
+  const [calendarResult, ...epsResults] = await Promise.allSettled([
+    fetchAVEarningsCalendar(),
+    ...tickers.map(t => fetchEpsActual(t).then(arr => ({ ticker: t, data: arr[0] || null }))),
+  ]);
+
+  const upcomingMap = calendarResult.status === 'fulfilled' ? (calendarResult.value || {}) : {};
+  const epsMap = {};
+  epsResults.forEach(r => {
+    if (r.status === 'fulfilled' && r.value?.data) epsMap[r.value.ticker] = r.value.data;
+  });
 
   const rows = tickers.map(t => {
     const info = EARNINGS_WATCHLIST[t];
-    const e = data[t];
-    if (!e) return { ticker:t, ...info, dateStr:null, isPast:false, isFuture:false, isToday:false, epsEst:null, epsAct:null, surprise:null };
+    const upcoming = upcomingMap[t];
+    const past = epsMap[t];
 
-    const hasNext = e.nextEarningsDate && e.nextEarningsDate > todayStr;
-    const dateStr  = hasNext ? e.nextEarningsDate : (e.reportDate || null);
-    const isFuture = !!hasNext;
-    const isPast   = !isFuture && !!dateStr && dateStr <= todayStr;
-    const isToday  = dateStr === todayStr;
-    const epsAct   = e.epsActual ?? null;
-    const epsEst   = e.epsEstimate ?? null;
-    const surprise = (epsAct !== null && epsEst !== null && epsEst !== 0)
-      ? ((epsAct - epsEst) / Math.abs(epsEst)) * 100 : null;
-
-    return { ticker:t, ...info, dateStr, isPast, isFuture, isToday, epsEst, epsAct, surprise };
+    if (upcoming?.reportDate && upcoming.reportDate > todayStr) {
+      return { ticker:t, ...info, dateStr:upcoming.reportDate, isFuture:true, isPast:false,
+        isToday:upcoming.reportDate===todayStr, epsEst:upcoming.estimate??null, epsAct:null, surprise:null };
+    }
+    if (past) {
+      const epsAct = past.actual ?? null;
+      const epsEst = past.estimate ?? null;
+      const surprise = (epsAct!==null && epsEst!==null && epsEst!==0)
+        ? ((epsAct-epsEst)/Math.abs(epsEst))*100 : null;
+      return { ticker:t, ...info, dateStr:past.period||null, isPast:true, isFuture:false,
+        isToday:past.period===todayStr, epsEst, epsAct, surprise };
+    }
+    return { ticker:t, ...info, dateStr:null, isPast:false, isFuture:false, isToday:false,
+      epsEst:null, epsAct:null, surprise:null };
   });
 
   try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), fingerprint: tickers.join(','), rows })); } catch {}
