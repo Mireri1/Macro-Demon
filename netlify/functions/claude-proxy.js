@@ -106,13 +106,31 @@ exports.handler = async (event) => {
   };
 
   const system = systemMap[type] || systemMap.ai_signal;
-  const safeTokens = Math.min(Number(max_tokens) || 1000, 1200);
+
+  // breaking_news and earnings_dates need live web search for real-time data
+  // All other types receive their data in the prompt — no search needed
+  // Haiku handles both well: factual lookups (earnings/news) and text analysis (ai_signal etc.)
+  const SEARCH_TYPES = new Set(['breaking_news', 'earnings_dates']);
+  const useSearch = SEARCH_TYPES.has(type);
+  const model = 'claude-haiku-4-5';
+  const tokenCap = useSearch ? 1500 : 800;
+  const safeTokens = Math.min(Number(max_tokens) || 1000, tokenCap);
   const safePrompt = String(prompt).slice(0, 4000);
 
   // Log the request
   const ts = Date.now();
   globalLog.push(ts);
   ipLog[ip].push(ts);
+
+  const requestBody = {
+    model,
+    max_tokens: safeTokens,
+    system,
+    messages: [{ role: 'user', content: safePrompt }],
+  };
+  if (useSearch) {
+    requestBody.tools = [{ type: 'web_search_20250305', name: 'web_search' }];
+  }
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -122,13 +140,7 @@ exports.handler = async (event) => {
         'x-api-key': ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
       },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: safeTokens,
-        system,
-        messages: [{ role: 'user', content: safePrompt }],
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {

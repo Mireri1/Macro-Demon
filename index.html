@@ -1627,6 +1627,21 @@ async function callClaude({ type, prompt, model = 'claude-sonnet-4-20250514', ma
 // ─────────────────────────────────────────────────────────
 async function runAI(regime, scores, avg, all) {
   const el = document.getElementById('aiText');
+
+  // Cache for 20 min — no need to call Claude every 5 min if regime hasn't changed
+  const CACHE_KEY = 'ai_signal_v1';
+  try {
+    const cached = sessionStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const { ts, text, cachedRegime } = JSON.parse(cached);
+      if (Date.now() - ts < 20 * 60 * 1000 && cachedRegime === regime) {
+        el.className = 'ai-text';
+        el.textContent = text;
+        return;
+      }
+    }
+  } catch {}
+
   el.className = 'ai-text loading';
   el.textContent = 'Synthesizing macro signals...';
 
@@ -1652,6 +1667,7 @@ In exactly 3 sentences:
   if (aiText) {
     el.className = 'ai-text';
     el.textContent = aiText;
+    try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), text: aiText, cachedRegime: regime })); } catch {}
     return;
   }
 
@@ -2419,13 +2435,13 @@ function breakingRenderTrack(stories) {
 }
 
 async function loadBreakingNews(forceRefresh = false) {
-  const CACHE_KEY = 'breaking_news_claude_v1';
-  const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+  const CACHE_KEY = 'breaking_news_v2';
+  const CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours — stored in localStorage for cross-tab sharing
 
   // Check cache first unless force refresh
   if (!forceRefresh) {
     try {
-      const cached = sessionStorage.getItem(CACHE_KEY);
+      const cached = localStorage.getItem(CACHE_KEY);
       if (cached) {
         const { ts, stories } = JSON.parse(cached);
         if (Date.now() - ts < CACHE_TTL && stories?.length) {
@@ -2436,6 +2452,31 @@ async function loadBreakingNews(forceRefresh = false) {
     } catch {}
   }
 
+  // Primary: newsdata.io direct fetch (free, fast, no Claude cost, no timeout risk)
+  if (NEWS_USE_LIVE && gnewsCanFetch()) {
+    try {
+      gnewsSpend(); gnewsBudgetWarning();
+      const q   = encodeURIComponent(BREAKING_QUERY);
+      const url = `https://newsdata.io/api/1/news?apikey=${CONFIG.GNEWS_API_KEY}&q=${q}&language=en&size=10`;
+      const r   = await fetch(url);
+      if (r.ok) {
+        const d = await r.json();
+        if (d.results?.length) {
+          const stories = d.results.map(a => ({
+            title:       a.title?.replace(/ - .*$/, '').replace(/ \| .*$/, '') || '',
+            publishedAt: a.pubDate || new Date().toISOString(),
+            source:      { name: a.source_id || '' },
+            url:         a.link || '#',
+          })).filter(s => s.title);
+          try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), stories })); } catch {}
+          breakingRenderTrack(stories);
+          return;
+        }
+      }
+    } catch {}
+  }
+
+  // Fallback: Claude with web_search (only if no newsdata.io key or API failed)
   try {
     const today = new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
     const prompt = `Today is ${today}. Search the web for the 8 most important breaking macro finance and geopolitical news stories from the last 24 hours. Focus on: Fed/central banks, inflation data, jobs, GDP, trade wars, geopolitical conflicts, oil/gold, crypto, earnings surprises, debt/credit events.
@@ -2464,7 +2505,6 @@ Return exactly 8 items. Real headlines only, no fabrication.`;
 
     const raw = JSON.parse(d.text.replace(/```json|```/g, '').trim());
     if (!Array.isArray(raw) || !raw.length) throw new Error('Invalid response');
-    // Normalize field names — Claude may return headline or title
     const stories = raw.map(s => ({
       title:       s.title || s.headline || '',
       publishedAt: s.publishedAt || s.pubDate || new Date().toISOString(),
@@ -2472,20 +2512,19 @@ Return exactly 8 items. Real headlines only, no fabrication.`;
       url:         s.url || '#',
     })).filter(s => s.title);
 
-    // Cache it
-    try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), stories })); } catch {}
-
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), stories })); } catch {}
     breakingRenderTrack(stories);
   } catch {
-    // Fallback to static stories if Claude fails
-    if (breakingStories.length && !forceRefresh) return;
-    const fallback = NEWS_STORIES.slice(0, 6).map(s => ({
-      title:       s.headline,
-      publishedAt: new Date(Date.now() - Math.random()*6*3600000).toISOString(),
-      source:      { name: s.catLabel },
-      url:         '#',
-    }));
-    breakingRenderTrack(fallback);
+    // Only show demo fallback if nothing is currently displayed
+    if (!breakingStories.length || forceRefresh) {
+      const fallback = NEWS_STORIES.slice(0, 6).map(s => ({
+        title:       s.headline,
+        publishedAt: new Date(Date.now() - Math.random()*6*3600000).toISOString(),
+        source:      { name: s.catLabel },
+        url:         '#',
+      }));
+      breakingRenderTrack(fallback);
+    }
   }
 }
 
