@@ -2452,28 +2452,20 @@ async function loadBreakingNews(forceRefresh = false) {
     } catch {}
   }
 
-  // Primary: newsdata.io direct fetch (free, fast, no Claude cost, no timeout risk)
-  if (NEWS_USE_LIVE && gnewsCanFetch()) {
-    try {
-      gnewsSpend(); gnewsBudgetWarning();
-      const q   = encodeURIComponent(BREAKING_QUERY);
-      const url = `https://newsdata.io/api/1/news?apikey=${CONFIG.GNEWS_API_KEY}&q=${q}&language=en&size=10`;
-      const r   = await fetch(url);
-      if (r.ok) {
-        const d = await r.json();
-        if (d.results?.length) {
-          const stories = d.results.map(a => ({
-            title:       a.title?.replace(/ - .*$/, '').replace(/ \| .*$/, '') || '',
-            publishedAt: a.pubDate || new Date().toISOString(),
-            source:      { name: a.source_id || '' },
-            url:         a.link || '#',
-          })).filter(s => s.title);
-          try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), stories })); } catch {}
-          breakingRenderTrack(stories);
-          return;
-        }
-      }
-    } catch {}
+  // Primary: reuse fetchLiveNews('all') — same API, already tested and working
+  if (NEWS_USE_LIVE) {
+    const liveStories = await fetchLiveNews('all');
+    if (liveStories?.length) {
+      const stories = liveStories.map(s => ({
+        title:       s.headline,
+        publishedAt: new Date().toISOString(),
+        source:      { name: s.source || '' },
+        url:         s.url || '#',
+      }));
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), stories })); } catch {}
+      breakingRenderTrack(stories);
+      return;
+    }
   }
 
   // Fallback: Claude with web_search (only if no newsdata.io key or API failed)
@@ -3659,13 +3651,14 @@ async function loadEarnings() {
   const todayStr = fmt(today);
   const tickers = Object.keys(EARNINGS_WATCHLIST);
 
-  // Check cache first
-  const CACHE_KEY = 'earnings_claude_v2';
+  // Cache for 24 hours — real market data doesn't need more frequent refresh
+  const CACHE_KEY = 'earnings_yahoo_v1';
+  const CACHE_TTL = 24 * 60 * 60 * 1000;
   try {
     const cached = localStorage.getItem(CACHE_KEY);
     if (cached) {
-      const { fingerprint, rows } = JSON.parse(cached);
-      if (fingerprint === tickers.join(',') && rows?.length) {
+      const { ts, fingerprint, rows } = JSON.parse(cached);
+      if (Date.now() - ts < CACHE_TTL && fingerprint === tickers.join(',') && rows?.length) {
         renderEarningsRows(rows, today, todayStr);
         runEarningsAI(rows, {});
         return;
@@ -3674,49 +3667,50 @@ async function loadEarnings() {
   } catch {}
 
   const wrap = document.getElementById('earningsTableWrap');
-  if (wrap) wrap.innerHTML = '<div class="earnings-loading">Fetching earnings via AI...</div>';
+  if (wrap) wrap.innerHTML = '<div class="earnings-loading">Loading earnings data...</div>';
 
-  const tickerList = tickers.map(t => `  "${t}": "${EARNINGS_WATCHLIST[t].name} (${EARNINGS_WATCHLIST[t].sector})"`).join(',\n');
-  const prompt = `Today is ${todayStr}. Search the web for earnings data for these companies. For each find the most recent quarterly report date and EPS, plus any upcoming scheduled date.
+  // Fetch all tickers in parallel from Yahoo Finance — real data, no LLM timeout risk
+  const results = await Promise.allSettled(
+    tickers.map(async ticker => {
+      try {
+        const res = await fetch('/.netlify/functions/claude-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'yahoo_earnings', ticker }),
+        });
+        if (!res.ok) return null;
+        const d = await res.json();
+        return d.error ? null : { ticker, ...d };
+      } catch { return null; }
+    })
+  );
 
-Tickers:
-{
-${tickerList}
-}
+  const data = {};
+  results.forEach((result, i) => {
+    if (result.status === 'fulfilled' && result.value) data[tickers[i]] = result.value;
+  });
 
-Return ONLY this JSON:
-{
-  "AAPL": { "reportDate": "2026-01-30", "fiscalPeriod": "Q4 2025", "epsActual": 2.41, "epsEstimate": 2.35, "isFuture": false }
-}
-isFuture=true if not yet reported. Only include tickers you found data for. Return ONLY valid JSON, no markdown.`;
+  const rows = tickers.map(t => {
+    const info = EARNINGS_WATCHLIST[t];
+    const e = data[t];
+    if (!e) return { ticker:t, ...info, dateStr:null, isPast:false, isFuture:false, isToday:false, epsEst:null, epsAct:null, surprise:null };
 
-  try {
-    const res = await fetch('/.netlify/functions/claude-proxy', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'earnings_dates', prompt, max_tokens: 3000 }),
-    });
-    if (!res.ok) throw new Error('proxy error');
-    const d = await res.json();
-    if (!d.text) throw new Error('no text');
-    const data = JSON.parse(d.text.replace(/```json|```/g,'').trim());
-    const rows = tickers.map(t => {
-      const info = EARNINGS_WATCHLIST[t];
-      const e = data[t];
-      if (!e) return { ticker:t, ...info, dateStr:null, isPast:false, isFuture:false, isToday:false, epsEst:null, epsAct:null, surprise:null };
-      const isPast = !e.isFuture && !!e.reportDate && e.reportDate <= todayStr;
-      const isFuture = !!e.isFuture || (!!e.reportDate && e.reportDate > todayStr);
-      const isToday = e.reportDate === todayStr;
-      const surprise = (e.epsActual!=null&&e.epsEstimate!=null&&e.epsEstimate!==0)
-        ? ((e.epsActual-e.epsEstimate)/Math.abs(e.epsEstimate))*100 : null;
-      return { ticker:t, ...info, dateStr:e.reportDate||null, isPast, isFuture, isToday,
-        epsEst:e.epsEstimate??null, epsAct:e.epsActual??null, surprise };
-    });
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ fingerprint: tickers.join(','), rows })); } catch {}
-    renderEarningsRows(rows, today, todayStr);
-    runEarningsAI(rows, {});
-  } catch {
-    if (wrap) wrap.innerHTML = '<div class="earnings-loading">Earnings unavailable — will retry.</div>';
-  }
+    const hasNext = e.nextEarningsDate && e.nextEarningsDate > todayStr;
+    const dateStr  = hasNext ? e.nextEarningsDate : (e.reportDate || null);
+    const isFuture = !!hasNext;
+    const isPast   = !isFuture && !!dateStr && dateStr <= todayStr;
+    const isToday  = dateStr === todayStr;
+    const epsAct   = e.epsActual ?? null;
+    const epsEst   = e.epsEstimate ?? null;
+    const surprise = (epsAct !== null && epsEst !== null && epsEst !== 0)
+      ? ((epsAct - epsEst) / Math.abs(epsEst)) * 100 : null;
+
+    return { ticker:t, ...info, dateStr, isPast, isFuture, isToday, epsEst, epsAct, surprise };
+  });
+
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), fingerprint: tickers.join(','), rows })); } catch {}
+  renderEarningsRows(rows, today, todayStr);
+  runEarningsAI(rows, {});
 }
 
 function renderEarningsRows(rows, today, todayStr) {

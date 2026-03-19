@@ -77,6 +77,39 @@ exports.handler = async (event) => {
     }
   }
 
+  // ── Yahoo Finance earnings proxy — structured earnings data, no LLM needed
+  if (type === 'yahoo_earnings') {
+    const { ticker } = body;
+    if (!ticker) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing ticker' }) };
+    const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=earningsHistory,earnings`;
+    try {
+      const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' } });
+      if (!r.ok) return { statusCode: r.status, headers, body: JSON.stringify({ error: 'Yahoo error' }) };
+      const d = await r.json();
+      const res = d?.quoteSummary?.result?.[0];
+      if (!res) return { statusCode: 404, headers, body: JSON.stringify({ error: 'No data' }) };
+
+      // Most recent past quarter — pick the one with the latest quarter timestamp
+      const history = res.earningsHistory?.history || [];
+      const last = history.reduce((best, h) =>
+        !best || (h.quarter?.raw || 0) > (best.quarter?.raw || 0) ? h : best, null);
+
+      // Next scheduled earnings date (Unix timestamp)
+      const earningsDates = res.earnings?.earningsChart?.earningsDate || [];
+      const nextTs = earningsDates[0]?.raw;
+      const nextDate = nextTs ? new Date(nextTs * 1000).toISOString().slice(0, 10) : null;
+
+      return { statusCode: 200, headers, body: JSON.stringify({
+        reportDate:       last?.quarter?.fmt || null,
+        epsActual:        last?.epsActual?.raw ?? null,
+        epsEstimate:      last?.epsEstimate?.raw ?? null,
+        nextEarningsDate: nextDate,
+      })};
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
   // ── FRED proxy — routes FRED API calls server-side to avoid browser CORS
   if (type === 'fred') {
     if (!seriesId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing seriesId' }) };
