@@ -117,23 +117,52 @@ exports.handler = async (event) => {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing tickers array' }) };
     }
     const fetchOne = async ticker => {
-      const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=earningsHistory,earnings`;
-      const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' } });
-      if (!r.ok) return null;
-      const d = await r.json();
-      const res = d?.quoteSummary?.result?.[0];
-      if (!res) return null;
-      const history = res.earningsHistory?.history || [];
-      const last = history.reduce((best, h) =>
-        !best || (h.quarter?.raw || 0) > (best.quarter?.raw || 0) ? h : best, null);
-      const nextTs = (res.earnings?.earningsChart?.earningsDate || [])[0]?.raw;
-      const nextDate = nextTs ? new Date(nextTs * 1000).toISOString().slice(0, 10) : null;
-      return {
-        reportDate:       last?.quarter?.fmt || null,
-        epsActual:        last?.epsActual?.raw ?? null,
-        epsEstimate:      last?.epsEstimate?.raw ?? null,
-        nextEarningsDate: nextDate,
-      };
+      // Primary: quoteSummary for full EPS data (4s timeout — fail fast if blocked)
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 4000);
+      try {
+        const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=earningsHistory,earnings`;
+        const r = await fetch(url, {
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
+          signal: ctrl.signal,
+        });
+        clearTimeout(t);
+        if (!r.ok) throw new Error('not ok');
+        const d = await r.json();
+        const res = d?.quoteSummary?.result?.[0];
+        if (!res) throw new Error('no result');
+        const history = res.earningsHistory?.history || [];
+        const last = history.reduce((best, h) =>
+          !best || (h.quarter?.raw || 0) > (best.quarter?.raw || 0) ? h : best, null);
+        const nextTs = (res.earnings?.earningsChart?.earningsDate || [])[0]?.raw;
+        return {
+          reportDate:       last?.quarter?.fmt || null,
+          epsActual:        last?.epsActual?.raw ?? null,
+          epsEstimate:      last?.epsEstimate?.raw ?? null,
+          nextEarningsDate: nextTs ? new Date(nextTs * 1000).toISOString().slice(0, 10) : null,
+        };
+      } catch {
+        clearTimeout(t);
+        // Fallback: chart endpoint (already works for prices) — has earningsTimestamps in meta
+        try {
+          const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5d`;
+          const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+          if (!r.ok) return null;
+          const d = await r.json();
+          const meta = d?.chart?.result?.[0]?.meta;
+          if (!meta) return null;
+          const now = Date.now();
+          const timestamps = meta.earningsTimestamps || [];
+          const upcoming = timestamps.filter(ts => ts * 1000 > now);
+          const past     = timestamps.filter(ts => ts * 1000 <= now);
+          return {
+            reportDate:       past.length    ? new Date(Math.max(...past)    * 1000).toISOString().slice(0, 10) : null,
+            epsActual:        null,
+            epsEstimate:      null,
+            nextEarningsDate: upcoming.length ? new Date(Math.min(...upcoming) * 1000).toISOString().slice(0, 10) : null,
+          };
+        } catch { return null; }
+      }
     };
     const results = await Promise.allSettled(tickers.map(fetchOne));
     const data = {};
