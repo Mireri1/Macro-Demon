@@ -110,6 +110,37 @@ exports.handler = async (event) => {
     }
   }
 
+  // ── Yahoo Finance earnings batch — all tickers in one call, parallel server-side
+  if (type === 'yahoo_earnings_batch') {
+    const { tickers } = body;
+    if (!Array.isArray(tickers) || !tickers.length) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing tickers array' }) };
+    }
+    const fetchOne = async ticker => {
+      const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=earningsHistory,earnings`;
+      const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' } });
+      if (!r.ok) return null;
+      const d = await r.json();
+      const res = d?.quoteSummary?.result?.[0];
+      if (!res) return null;
+      const history = res.earningsHistory?.history || [];
+      const last = history.reduce((best, h) =>
+        !best || (h.quarter?.raw || 0) > (best.quarter?.raw || 0) ? h : best, null);
+      const nextTs = (res.earnings?.earningsChart?.earningsDate || [])[0]?.raw;
+      const nextDate = nextTs ? new Date(nextTs * 1000).toISOString().slice(0, 10) : null;
+      return {
+        reportDate:       last?.quarter?.fmt || null,
+        epsActual:        last?.epsActual?.raw ?? null,
+        epsEstimate:      last?.epsEstimate?.raw ?? null,
+        nextEarningsDate: nextDate,
+      };
+    };
+    const results = await Promise.allSettled(tickers.map(fetchOne));
+    const data = {};
+    results.forEach((r, i) => { if (r.status === 'fulfilled' && r.value) data[tickers[i]] = r.value; });
+    return { statusCode: 200, headers, body: JSON.stringify(data) };
+  }
+
   // ── FRED proxy — routes FRED API calls server-side to avoid browser CORS
   if (type === 'fred') {
     if (!seriesId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing seriesId' }) };

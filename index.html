@@ -1931,6 +1931,23 @@ function gnewsBudgetWarning() {
   }
 }
 
+// Deduplicate stories by title similarity — filters near-identical headlines
+// Works on both {headline} (news cards) and {title} (breaking ticker) formats
+function dedupeStories(arr, key = 'headline') {
+  const kept = [];
+  return arr.filter(s => {
+    const text = (s[key] || '').toLowerCase().replace(/[^a-z0-9 ]/g, '');
+    const words = new Set(text.split(/\s+/).filter(w => w.length > 3));
+    if (words.size < 2) return true;
+    const isDup = kept.some(k => {
+      const inter = [...words].filter(w => k.has(w)).length;
+      return inter / Math.max(words.size, k.size, 1) > 0.5;
+    });
+    if (!isDup) kept.push(words);
+    return !isDup;
+  });
+}
+
 async function fetchLiveNews(tab) {
   const now = Date.now();
   if (newsCache[tab] && (now - (newsCacheTime[tab]||0)) < NEWS_CACHE_TTL) return newsCache[tab];
@@ -1976,9 +1993,10 @@ async function fetchLiveNews(tab) {
       source:     a.source_id || '',
     }));
 
-    newsCache[tab] = stories;
+    const deduped = dedupeStories(stories, 'headline');
+    newsCache[tab] = deduped;
     newsCacheTime[tab] = Date.now();
-    return stories;
+    return deduped;
   } catch { return null; }
 }
 
@@ -2456,12 +2474,15 @@ async function loadBreakingNews(forceRefresh = false) {
   if (NEWS_USE_LIVE) {
     const liveStories = await fetchLiveNews('all');
     if (liveStories?.length) {
-      const stories = liveStories.map(s => ({
-        title:       s.headline,
-        publishedAt: new Date().toISOString(),
-        source:      { name: s.source || '' },
-        url:         s.url || '#',
-      }));
+      const stories = dedupeStories(
+        liveStories.map(s => ({
+          title:       s.headline,
+          publishedAt: new Date().toISOString(),
+          source:      { name: s.source || '' },
+          url:         s.url || '#',
+        })),
+        'title'
+      );
       try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), stories })); } catch {}
       breakingRenderTrack(stories);
       return;
@@ -3669,26 +3690,16 @@ async function loadEarnings() {
   const wrap = document.getElementById('earningsTableWrap');
   if (wrap) wrap.innerHTML = '<div class="earnings-loading">Loading earnings data...</div>';
 
-  // Fetch all tickers in parallel from Yahoo Finance — real data, no LLM timeout risk
-  const results = await Promise.allSettled(
-    tickers.map(async ticker => {
-      try {
-        const res = await fetch('/.netlify/functions/claude-proxy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'yahoo_earnings', ticker }),
-        });
-        if (!res.ok) return null;
-        const d = await res.json();
-        return d.error ? null : { ticker, ...d };
-      } catch { return null; }
-    })
-  );
-
-  const data = {};
-  results.forEach((result, i) => {
-    if (result.status === 'fulfilled' && result.value) data[tickers[i]] = result.value;
-  });
+  // Single batch call — Netlify fetches all tickers in parallel server-side, 1 roundtrip
+  let data = {};
+  try {
+    const res = await fetch('/.netlify/functions/claude-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'yahoo_earnings_batch', tickers }),
+    });
+    if (res.ok) data = await res.json();
+  } catch {}
 
   const rows = tickers.map(t => {
     const info = EARNINGS_WATCHLIST[t];
