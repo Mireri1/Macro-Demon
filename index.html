@@ -4,10 +4,29 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MACRO DEMON</title>
+
+<!-- Preconnect to all third-party origins so the browser can warm sockets in parallel
+     while the rest of the document is parsing. Saves ~100–300ms per origin on first paint. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link rel="preconnect" href="https://query1.finance.yahoo.com">
+<link rel="preconnect" href="https://query2.finance.yahoo.com">
+<link rel="preconnect" href="https://finnhub.io">
+<link rel="preconnect" href="https://api.stlouisfed.org">
+<link rel="preconnect" href="https://newsdata.io">
+<link rel="preconnect" href="https://www.alphavantage.co">
+<link rel="preconnect" href="https://api.coingecko.com">
+<!-- dns-prefetch fallback for older browsers that don't honor preconnect -->
+<link rel="dns-prefetch" href="https://api.binance.com">
+
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/1.2.1/chartjs-plugin-zoom.min.js"></script>
+
+<!-- defer: download in parallel with HTML parse, execute right before DOMContentLoaded.
+     Order is preserved across deferred scripts. Eliminates render-blocking on first paint. -->
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/1.2.1/chartjs-plugin-zoom.min.js"></script>
 <style>
 :root {
   --bg:#080a0e; --surface:#0d1117; --border:#1c2333; --border-bright:#2d3f5a;
@@ -645,6 +664,33 @@ footer{border-top:1px solid var(--border);padding-top:18px;display:flex;justify-
 
 <script>
 // ══════════════════════════════════════════════════════════
+// ▸▸ FUNCTION-LEVEL SHARED SECRET (sent as x-md-key header)
+// ══════════════════════════════════════════════════════════
+// This secret is checked by netlify/functions/claude-proxy.js. It's a
+// "raise-the-bar" defence against random curl-from-strangers, NOT real
+// auth (the value lives in the browser bundle). For real auth you'd
+// need user accounts.
+//
+// To set it:
+//   1) Pick any random string (>= 16 chars, e.g. `openssl rand -hex 32`)
+//   2) In Netlify UI → Site settings → Environment variables, set
+//      FUNCTION_SECRET to the same value
+//   3) Either edit the fallback below, OR use Netlify Snippet Injection
+//      (Site settings → Build & deploy → Post processing → Snippet
+//       injection) to inject:
+//         <script>window.MD_FUNCTION_SECRET = "your-value-here";</script>
+//      The injection happens server-side at deploy time, so the secret
+//      never lands in source control.
+//
+// Fallback (used if nothing's injected): leave empty = no auth (dev mode).
+const MD_FUNCTION_SECRET = (typeof window !== 'undefined' && window.MD_FUNCTION_SECRET) || '';
+
+// Headers all proxy fetches use — saves repeating in 11 callsites.
+const PROXY_HEADERS = MD_FUNCTION_SECRET
+  ? { 'Content-Type': 'application/json', 'x-md-key': MD_FUNCTION_SECRET }
+  : { 'Content-Type': 'application/json' };
+
+// ══════════════════════════════════════════════════════════
 // ▸▸ PLUG YOUR API KEYS HERE
 // ══════════════════════════════════════════════════════════
 const CONFIG = {
@@ -729,7 +775,7 @@ async function fetchFRED(seriesId, limit = 26) {
   try {
     const res = await fetch('/.netlify/functions/claude-proxy', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: PROXY_HEADERS,
       body: JSON.stringify({
         type: 'fred',
         seriesId,
@@ -766,7 +812,7 @@ async function fetchYahoo(ticker) {
     const fhSym = YAHOO_TO_FINNHUB[ticker] || ticker;
     const r = await fetch('/.netlify/functions/claude-proxy', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: PROXY_HEADERS,
       body: JSON.stringify({ type: 'finnhub', path: 'quote', params: { symbol: fhSym } }),
     });
     if (r.ok) {
@@ -778,7 +824,7 @@ async function fetchYahoo(ticker) {
   try {
     const res = await fetch('/.netlify/functions/claude-proxy', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: PROXY_HEADERS,
       body: JSON.stringify({ type: 'yahoo', ticker }),
     });
     if (res.ok) {
@@ -1261,7 +1307,7 @@ async function loadLiquidity() {
       try {
         const r = await fetch('/.netlify/functions/claude-proxy', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: PROXY_HEADERS,
           body: JSON.stringify({ type: 'finnhub', path: 'quote', params: { symbol: d.finnhubSym } }),
         });
         if (r.ok) {
@@ -1566,7 +1612,7 @@ async function callClaude({ type, prompt, model = 'claude-sonnet-4-20250514', ma
   try {
     const res = await fetch(CLAUDE_PROXY, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: PROXY_HEADERS,
       body:    JSON.stringify({ type, prompt, model, max_tokens }),
     });
     if (res.status === 429) { console.warn('Claude rate limited'); return null; }
@@ -1921,7 +1967,7 @@ async function fetchLiveNews(tab) {
     gnewsSpend(); gnewsBudgetWarning();
     const r = await fetch('/.netlify/functions/claude-proxy', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: PROXY_HEADERS,
       body: JSON.stringify({ type: 'gnews', q, language: 'en', size: 9 }),
     });
     if (!r.ok) return null;
@@ -2468,7 +2514,7 @@ Return exactly 8 items. Real headlines only, no fabrication.`;
 
     const res = await fetch('/.netlify/functions/claude-proxy', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: PROXY_HEADERS,
       body: JSON.stringify({ type: 'breaking_news', prompt, max_tokens: 1500 }),
     });
 
@@ -2698,7 +2744,7 @@ async function tcFetchFinnhub() {
     const res  = TC.interval; // D or W
     const r = await fetch('/.netlify/functions/claude-proxy', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: PROXY_HEADERS,
       body: JSON.stringify({
         type: 'finnhub',
         path: 'stock/candle',
@@ -2733,7 +2779,7 @@ async function tcFetchAlphaVantage() {
 
     const r = await fetch('/.netlify/functions/claude-proxy', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: PROXY_HEADERS,
       body: JSON.stringify({ type: 'alpha_vantage', params: avParams }),
     });
     if (!r.ok) return null;
@@ -2802,7 +2848,7 @@ async function tcSearchSuggest(q) {
   try {
     const r = await fetch('/.netlify/functions/claude-proxy', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: PROXY_HEADERS,
       body: JSON.stringify({ type: 'finnhub', path: 'search', params: { q } }),
     });
     const d = await r.json();
@@ -3536,7 +3582,19 @@ async function tcLoad() {
 window.addEventListener('resize',()=>{ tcSyncSizes(); tcDraw(); tcInitOverlay(); });
 setTimeout(tcLoad, 300);
 
-
+// ── Service Worker registration ─────────────────────────────────────────
+// Caches app shell + Yahoo/FRED/Finnhub/etc. for instant load on revisit.
+// Stale-while-revalidate on data APIs so the page renders immediately
+// from cache, then updates with fresh data in the background.
+// To force a fresh fetch of everything: in DevTools → Application → Storage → Clear site data.
+if ('serviceWorker' in navigator) {
+  // Register after first paint so SW work doesn't compete with critical rendering.
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(err => {
+      console.warn('[sw] registration failed:', err.message);
+    });
+  });
+}
 
 </script>
 </body>

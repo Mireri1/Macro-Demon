@@ -1,4 +1,12 @@
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+// Shared secret the browser sends in x-md-key. Set this in Netlify env vars
+// (any random hex string ≥16 chars). Combined with the referer check below,
+// it raises the bar from "anyone with curl" to "must inspect view-source AND
+// be allowed by referer policy."
+const FUNCTION_SECRET = process.env.FUNCTION_SECRET;
+// Origin allowlist — set to your Netlify URL in env. If unset, allows any
+// origin (dev mode). Comma-separated for multiple (preview deploys, etc.).
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
 
 // Simple in-memory rate limiting
 const ipLog = {};
@@ -9,11 +17,20 @@ function cleanOld(arr) {
   while (arr.length && arr[0] < cutoff) arr.shift();
 }
 
+function getOriginHeader(reqOrigin) {
+  // If allowlist set, only echo back the matching origin (no wildcards).
+  // Otherwise reflect the request origin (dev convenience).
+  if (ALLOWED_ORIGINS.length === 0) return reqOrigin || '*';
+  return ALLOWED_ORIGINS.includes(reqOrigin) ? reqOrigin : ALLOWED_ORIGINS[0];
+}
+
 exports.handler = async (event) => {
+  const reqOrigin = event.headers['origin'] || event.headers['Origin'] || '';
   const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Origin': getOriginHeader(reqOrigin),
+    'Access-Control-Allow-Headers': 'Content-Type, x-md-key',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
     'Content-Type': 'application/json',
   };
 
@@ -27,6 +44,26 @@ exports.handler = async (event) => {
 
   if (!ANTHROPIC_API_KEY) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'API key not configured' }) };
+  }
+
+  // ── Function-level auth: shared secret + referer check ───────────────────
+  // The shared secret is in the page bundle (so anyone who really wants it
+  // can read view-source), but combined with the referer check it stops
+  // automated abuse and casual curl-from-strangers. Real defence-in-depth
+  // would need user accounts; this is "good enough for friends-only."
+  if (FUNCTION_SECRET) {
+    const presented = event.headers['x-md-key'] || event.headers['X-Md-Key'] || '';
+    if (presented !== FUNCTION_SECRET) {
+      return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) };
+    }
+  }
+  if (ALLOWED_ORIGINS.length > 0) {
+    const referer = event.headers['referer'] || event.headers['Referer'] || '';
+    const okReferer = ALLOWED_ORIGINS.some(o => referer.startsWith(o));
+    const okOrigin = ALLOWED_ORIGINS.includes(reqOrigin);
+    if (!okReferer && !okOrigin) {
+      return { statusCode: 403, headers, body: JSON.stringify({ error: 'Forbidden origin' }) };
+    }
   }
 
   // Global rate limit - 500/hour
@@ -290,10 +327,16 @@ exports.handler = async (event) => {
   globalLog.push(ts);
   ipLog[ip].push(ts);
 
+  // System prompts in `systemMap` are STATIC — wrap them as a content block
+  // with cache_control so Anthropic caches them for the 5-min window.
+  // First call writes to cache (full price); subsequent calls within the
+  // window read from cache at ~10% of input-token cost. For Macro Demon's
+  // usage pattern (multiple AI calls in a session) this saves ~80–90% of
+  // system-prompt tokens.
   const requestBody = {
     model,
     max_tokens: safeTokens,
-    system,
+    system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: safePrompt }],
   };
   if (useSearch) {
@@ -321,7 +364,9 @@ exports.handler = async (event) => {
     // Web search returns multiple content blocks — find the last text block
     const textBlock = (data.content || []).filter(b => b.type === 'text').pop();
     const text = textBlock?.text || '';
-    console.log(`[${type}] ip=${ip} tokens_in=${data.usage?.input_tokens} tokens_out=${data.usage?.output_tokens}`);
+    // Log cache hits/misses so we can verify the savings are landing
+    const u = data.usage || {};
+    console.log(`[${type}] ip=${ip} in=${u.input_tokens} out=${u.output_tokens} cache_create=${u.cache_creation_input_tokens || 0} cache_read=${u.cache_read_input_tokens || 0}`);
 
     return { statusCode: 200, headers, body: JSON.stringify({ text }) };
 
