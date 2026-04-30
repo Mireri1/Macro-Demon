@@ -648,14 +648,15 @@ footer{border-top:1px solid var(--border);padding-top:18px;display:flex;justify-
 // ▸▸ PLUG YOUR API KEYS HERE
 // ══════════════════════════════════════════════════════════
 const CONFIG = {
-  FRED_API_KEY: 'b0a6e25d3c3e7ce883de9c27dfbbb5e4',
-  // ─── NEWSDATA.IO ──────────────────────────────────────
-  // newsdata.io — browser CORS-friendly, 200 credits/day free
-  GNEWS_API_KEY: 'pub_a4d8ad80e99942699c927c202edc01e3',
-  // Finnhub — free at finnhub.io, 60 req/min, no CORS issues
-  FINNHUB_API_KEY: 'd6flif9r01qqnmbp57cgd6flif9r01qqnmbp57d0',
-  // Alpha Vantage — free 25 req/day, 20yr history, get key at alphavantage.co
-  ALPHA_VANTAGE_KEY: '5F49TCTQK13G69ML',
+  // API keys are NOT in the browser anymore. They live as env vars on the
+  // Netlify side (FRED_API_KEY, FINNHUB_API_KEY, GNEWS_API_KEY,
+  // ALPHA_VANTAGE_API_KEY) and are injected by netlify/functions/claude-proxy.js.
+  // The values below are only enable-toggles for that data source — set to
+  // truthy to route through the proxy, falsy to disable.
+  FRED_API_KEY: 'proxy',
+  GNEWS_API_KEY: 'proxy',
+  FINNHUB_API_KEY: 'proxy',
+  ALPHA_VANTAGE_KEY: 'proxy',
 };
 // ══════════════════════════════════════════════════════════
 
@@ -760,10 +761,14 @@ function gv(obs, i = 0) {
 
 // Yahoo Finance via Netlify proxy — returns { price, prevClose, change, changePct }
 async function fetchYahoo(ticker) {
-  // Tier 1: Finnhub (no CORS issues, native support)
+  // Tier 1: Finnhub via Netlify proxy (key is server-side only)
   try {
     const fhSym = YAHOO_TO_FINNHUB[ticker] || ticker;
-    const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(fhSym)}&token=${CONFIG.FINNHUB_API_KEY}`);
+    const r = await fetch('/.netlify/functions/claude-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'finnhub', path: 'quote', params: { symbol: fhSym } }),
+    });
     if (r.ok) {
       const d = await r.json();
       if (d.c && d.c !== 0) return { price: d.c, prevClose: d.pc, change: d.d, changePct: d.dp };
@@ -1254,7 +1259,11 @@ async function loadLiquidity() {
     }
     if (d.finnhubSym) {
       try {
-        const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(d.finnhubSym)}&token=${CONFIG.FINNHUB_API_KEY}`);
+        const r = await fetch('/.netlify/functions/claude-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'finnhub', path: 'quote', params: { symbol: d.finnhubSym } }),
+        });
         if (r.ok) {
           const fh = await r.json();
           if (fh.c && fh.c !== 0) return { val: fh.c, prev: fh.pc, date: today };
@@ -1906,12 +1915,15 @@ async function fetchLiveNews(tab) {
     return newsCache[tab] || null;
   }
 
-  const q   = encodeURIComponent(NEWS_QUERIES[tab] || NEWS_QUERIES.all);
-  const url = `https://newsdata.io/api/1/news?apikey=${CONFIG.GNEWS_API_KEY}&q=${q}&language=en&size=9`;
+  const q = NEWS_QUERIES[tab] || NEWS_QUERIES.all;
 
   try {
     gnewsSpend(); gnewsBudgetWarning();
-    const r = await fetch(url);
+    const r = await fetch('/.netlify/functions/claude-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'gnews', q, language: 'en', size: 9 }),
+    });
     if (!r.ok) return null;
     const d = await r.json();
     if (!d.results?.length) return null;
@@ -2684,8 +2696,15 @@ async function tcFetchFinnhub() {
     const to   = Math.floor(Date.now()/1000);
     const from = to - Math.ceil(TC.days*1.6)*86400;
     const res  = TC.interval; // D or W
-    const url  = `https://finnhub.io/api/v1/stock/candle?symbol=${encodeURIComponent(TC.symbol)}&resolution=${res}&from=${from}&to=${to}&token=${FINNHUB_KEY}`;
-    const r    = await fetch(url);
+    const r = await fetch('/.netlify/functions/claude-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'finnhub',
+        path: 'stock/candle',
+        params: { symbol: TC.symbol, resolution: res, from, to },
+      }),
+    });
     if (!r.ok) return null;
     const d    = await r.json();
     if (d.s !== 'ok' || !d.t?.length) return null;
@@ -2701,18 +2720,22 @@ async function tcFetchAlphaVantage() {
     const sym      = tcToAVSymbol(TC.symbol);
     const isCrypto = tcIsCrypto(TC.symbol);
     const isForex  = tcIsForex(TC.symbol);
-    let url;
+    let avParams;
 
     if (isCrypto) {
-      url = `https://www.alphavantage.co/query?function=DIGITAL_CURRENCY_DAILY&symbol=${sym}&market=USD&apikey=${AV_KEY}`;
+      avParams = { function: 'DIGITAL_CURRENCY_DAILY', symbol: sym, market: 'USD' };
     } else if (isForex) {
-      url = `https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=${sym}&to_symbol=USD&outputsize=full&apikey=${AV_KEY}`;
+      avParams = { function: 'FX_DAILY', from_symbol: sym, to_symbol: 'USD', outputsize: 'full' };
     } else {
       const outputSize = TC.days > 100 ? 'full' : 'compact';
-      url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${sym}&outputsize=${outputSize}&apikey=${AV_KEY}`;
+      avParams = { function: 'TIME_SERIES_DAILY', symbol: sym, outputsize: outputSize };
     }
 
-    const r = await fetch(url);
+    const r = await fetch('/.netlify/functions/claude-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'alpha_vantage', params: avParams }),
+    });
     if (!r.ok) return null;
     const d = await r.json();
 
@@ -2777,7 +2800,11 @@ async function tcSearchSuggest(q) {
     box.classList.add('show'); return;
   }
   try {
-    const r = await fetch(`https://finnhub.io/api/v1/search?q=${encodeURIComponent(q)}&token=${FINNHUB_KEY}`);
+    const r = await fetch('/.netlify/functions/claude-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'finnhub', path: 'search', params: { q } }),
+    });
     const d = await r.json();
     const items = (d.result||[]).slice(0,8);
     if (!items.length) { box.classList.remove('show'); return; }

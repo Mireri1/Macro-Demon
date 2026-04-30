@@ -173,11 +173,88 @@ exports.handler = async (event) => {
   // ── FRED proxy — routes FRED API calls server-side to avoid browser CORS
   if (type === 'fred') {
     if (!seriesId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing seriesId' }) };
-    const FRED_KEY = 'b0a6e25d3c3e7ce883de9c27dfbbb5e4';
-    const fredUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${FRED_KEY}&file_type=json&sort_order=desc&limit=${limit || 26}`;
+    const FRED_KEY = process.env.FRED_API_KEY;
+    if (!FRED_KEY) return { statusCode: 500, headers, body: JSON.stringify({ error: 'FRED_API_KEY not configured' }) };
+    const fredUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${encodeURIComponent(seriesId)}&api_key=${FRED_KEY}&file_type=json&sort_order=desc&limit=${Number(limit) || 26}`;
     try {
       const r = await fetch(fredUrl);
       if (!r.ok) return { statusCode: r.status, headers, body: JSON.stringify({ error: 'FRED error' }) };
+      const d = await r.json();
+      return { statusCode: 200, headers, body: JSON.stringify(d) };
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
+  // ── Finnhub proxy — routes Finnhub API calls server-side; key never reaches browser
+  // body: { type: 'finnhub', path: 'quote'|'stock/candle'|'search', params: { ... } }
+  if (type === 'finnhub') {
+    const FINNHUB_KEY = process.env.FINNHUB_API_KEY;
+    if (!FINNHUB_KEY) return { statusCode: 500, headers, body: JSON.stringify({ error: 'FINNHUB_API_KEY not configured' }) };
+    const ALLOWED_PATHS = new Set(['quote', 'stock/candle', 'search']);
+    const path = String(body.path || '');
+    if (!ALLOWED_PATHS.has(path)) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid Finnhub path' }) };
+    }
+    const params = (body.params && typeof body.params === 'object') ? body.params : {};
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      if (v != null) qs.set(k, String(v));
+    }
+    qs.set('token', FINNHUB_KEY);
+    try {
+      const r = await fetch(`https://finnhub.io/api/v1/${path}?${qs.toString()}`);
+      if (!r.ok) return { statusCode: r.status, headers, body: JSON.stringify({ error: 'Finnhub error' }) };
+      const d = await r.json();
+      return { statusCode: 200, headers, body: JSON.stringify(d) };
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
+  // ── NewsData.io proxy — routes news API calls server-side
+  // body: { type: 'gnews', q: '...', size?: number, language?: 'en' }
+  if (type === 'gnews') {
+    const GNEWS_KEY = process.env.GNEWS_API_KEY;
+    if (!GNEWS_KEY) return { statusCode: 500, headers, body: JSON.stringify({ error: 'GNEWS_API_KEY not configured' }) };
+    const q = String(body.q || '').slice(0, 200);
+    if (!q) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing q' }) };
+    const size = Math.min(Number(body.size) || 9, 50);
+    const language = String(body.language || 'en').slice(0, 5);
+    const url = `https://newsdata.io/api/1/news?apikey=${GNEWS_KEY}&q=${encodeURIComponent(q)}&language=${encodeURIComponent(language)}&size=${size}`;
+    try {
+      const r = await fetch(url);
+      if (!r.ok) return { statusCode: r.status, headers, body: JSON.stringify({ error: 'NewsData error' }) };
+      const d = await r.json();
+      return { statusCode: 200, headers, body: JSON.stringify(d) };
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
+  // ── Alpha Vantage proxy — routes AV calls server-side
+  // body: { type: 'alpha_vantage', params: { function: '...', symbol: '...', ... } }
+  if (type === 'alpha_vantage') {
+    const AV_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+    if (!AV_KEY) return { statusCode: 500, headers, body: JSON.stringify({ error: 'ALPHA_VANTAGE_API_KEY not configured' }) };
+    const ALLOWED_FUNCTIONS = new Set([
+      'TIME_SERIES_DAILY', 'TIME_SERIES_WEEKLY', 'TIME_SERIES_MONTHLY',
+      'DIGITAL_CURRENCY_DAILY', 'FX_DAILY',
+      'GLOBAL_QUOTE', 'OVERVIEW',
+    ]);
+    const params = (body.params && typeof body.params === 'object') ? body.params : {};
+    const fn = String(params.function || '');
+    if (!ALLOWED_FUNCTIONS.has(fn)) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid Alpha Vantage function' }) };
+    }
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      if (v != null) qs.set(k, String(v));
+    }
+    qs.set('apikey', AV_KEY);
+    try {
+      const r = await fetch(`https://www.alphavantage.co/query?${qs.toString()}`);
+      if (!r.ok) return { statusCode: r.status, headers, body: JSON.stringify({ error: 'Alpha Vantage error' }) };
       const d = await r.json();
       return { statusCode: 200, headers, body: JSON.stringify(d) };
     } catch (err) {
