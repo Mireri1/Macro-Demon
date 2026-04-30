@@ -404,9 +404,270 @@ footer{border-top:1px solid var(--border);padding-top:18px;display:flex;justify-
 }
 .breaking-ctrl-btn:hover{ color:var(--text); }
 
+/* ─── RESPONSIVE: tablet ≤900px ─────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .wrap{ padding:0 14px 40px; }
+  header{ padding:18px 0 14px; margin-bottom:14px; }
+  .header-right{ align-items:flex-start; text-align:left; }
+  .vibe-drivers{ gap:10px; }
+  .regime-banner{ grid-template-columns:1fr; gap:14px; padding:14px 16px; }
+  .regime-banner > *{ border:none; }
+  .why-grid{ grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); }
+  .ind-grid{ grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); }
+  .two-col{ grid-template-columns:1fr; }
+  .news-grid{ grid-template-columns:1fr; }
+  .score-grid{ grid-template-columns:repeat(2,1fr); gap:10px; }
+  .score-circle{ width:60px; height:60px; font-size:18px; }
+  .panel{ padding:14px 14px; }
+}
+
+/* ─── RESPONSIVE: phone ≤640px ──────────────────────────────────────────── */
+@media (max-width: 640px) {
+  body{ font-size:13px; }
+  .wrap{ padding:0 10px 28px; }
+  header{ flex-direction:column; align-items:flex-start; gap:6px; padding:12px 0 10px; }
+  .header-right{ align-items:flex-start; }
+  .vibe-drivers{ gap:6px 12px; font-size:11px; }
+  .ind-grid{ grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); }
+  .news-tabs{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .news-tabs > *{ flex-shrink:0; }
+  .panel{ padding:12px 12px; }
+  .panel-title{ letter-spacing:2px; margin-bottom:10px; }
+  .sec-head{ letter-spacing:2px; padding:6px 10px; }
+  /* Charts: cap height so they don't dominate phone screens */
+  canvas{ max-height:280px !important; }
+  /* Make any inline 2-col stat tables stack */
+  .y-row{ font-size:11px; }
+  .c-chg{ font-size:10px; }
+  /* Score grid full single column on tiny screens */
+  .score-grid{ grid-template-columns:1fr 1fr; gap:8px; }
+  /* Footer wraps cleanly */
+  footer{ font-size:9px; gap:6px; }
+  /* Trading chart controls: let them wrap instead of overflowing */
+  .tc-sub-wrap{ overflow-x:auto; }
+}
+
+/* ─── JOURNAL UI (sits next to alerts FAB) ─────────────────────────────── */
+.md-journal-fab{
+  position:fixed; bottom:20px; right:80px; z-index:9000;
+  width:48px; height:48px; border-radius:50%;
+  background:var(--surface); border:1px solid var(--border-bright);
+  color:var(--text-bright); font-size:20px;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,0.4);
+  transition:transform .15s, border-color .15s;
+}
+.md-journal-fab:hover{ transform:translateY(-2px); border-color:var(--accent); }
+.md-journal-card{ max-width:680px; }
+.md-journal-form{
+  display:grid;
+  grid-template-columns:repeat(4, 1fr);
+  gap:6px;
+  margin-bottom:8px;
+}
+.md-journal-form input, .md-journal-form select, .md-journal-form textarea{
+  background:var(--bg); border:1px solid var(--border-bright);
+  color:var(--text-bright); padding:7px 8px; font-family:inherit; font-size:12px;
+}
+.md-journal-form textarea{
+  grid-column:1 / -1; resize:vertical; min-height:60px;
+}
+.md-journal-form button{
+  grid-column:1 / -1;
+  background:var(--accent); color:var(--bg); border:none; padding:8px 12px;
+  font-size:11px; font-weight:600; letter-spacing:1px; text-transform:uppercase; cursor:pointer;
+}
+.md-journal-list{ display:flex; flex-direction:column; gap:8px; margin-bottom:20px; max-height:400px; overflow-y:auto; }
+.md-journal-entry{
+  background:var(--bg); border:1px solid var(--border);
+  padding:10px 12px; font-size:12px;
+}
+.md-journal-entry.open{ border-left:3px solid var(--blue); }
+.md-journal-entry.won{ border-left:3px solid var(--green); }
+.md-journal-entry.lost{ border-left:3px solid var(--red); }
+.md-journal-entry.closed{ border-left:3px solid var(--text-dim); opacity:0.7; }
+.md-journal-entry .head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+.md-journal-entry .ticker{ color:var(--text-bright); font-weight:600; letter-spacing:1px; }
+.md-journal-entry .ticker .dir-long{ color:var(--green); margin-left:6px; }
+.md-journal-entry .ticker .dir-short{ color:var(--red); margin-left:6px; }
+.md-journal-entry .ticker .dir-watch{ color:var(--text-dim); margin-left:6px; }
+.md-journal-entry .ticker .conviction{ color:var(--text-dim); font-size:10px; margin-left:6px; }
+.md-journal-entry .meta{ color:var(--text-dim); font-size:10px; }
+.md-journal-entry .thesis{ color:var(--text); margin:6px 0; line-height:1.5; white-space:pre-wrap; }
+.md-journal-entry .levels{ display:flex; gap:14px; font-size:11px; color:var(--text-dim); margin-top:6px; }
+.md-journal-entry .levels strong{ color:var(--text); margin-right:4px; }
+.md-journal-entry .ctrl{ display:flex; gap:6px; margin-top:8px; }
+.md-journal-entry .ctrl button{
+  background:transparent; border:1px solid var(--border-bright); color:var(--text-dim);
+  padding:4px 8px; cursor:pointer; font-size:10px; letter-spacing:1px; text-transform:uppercase;
+}
+.md-journal-entry .ctrl button:hover{ color:var(--text-bright); border-color:var(--accent); }
+.md-journal-empty{ color:var(--text-dim); font-size:12px; text-align:center; padding:20px; }
+@media (max-width: 640px){
+  .md-journal-form{ grid-template-columns:1fr 1fr; }
+}
+
+/* ─── ALERTS UI ────────────────────────────────────────────────────────── */
+.md-alerts-fab{
+  position:fixed; bottom:20px; right:20px; z-index:9000;
+  width:48px; height:48px; border-radius:50%;
+  background:var(--surface); border:1px solid var(--border-bright);
+  color:var(--text-bright); font-size:20px;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,0.4);
+  transition:transform .15s, border-color .15s;
+}
+.md-alerts-fab:hover{ transform:translateY(-2px); border-color:var(--accent); }
+.md-alerts-fab .badge{
+  position:absolute; top:-4px; right:-4px;
+  background:var(--green); color:#000;
+  font-size:10px; font-weight:600; line-height:1;
+  padding:3px 6px; border-radius:10px; min-width:14px; text-align:center;
+}
+.md-alerts-fab.has-alert{ border-color:var(--red); animation:md-fab-pulse 1.6s ease-in-out infinite; }
+@keyframes md-fab-pulse{
+  0%,100%{ box-shadow:0 4px 14px rgba(0,0,0,0.4); }
+  50%   { box-shadow:0 4px 20px var(--red); }
+}
+
+.md-alerts-modal{
+  position:fixed; inset:0; z-index:9100;
+  background:rgba(8,10,14,0.85); display:none;
+  align-items:flex-start; justify-content:center; padding:40px 16px;
+  overflow-y:auto;
+}
+.md-alerts-modal.open{ display:flex; }
+.md-alerts-card{
+  background:var(--surface); border:1px solid var(--border-bright);
+  width:100%; max-width:560px; padding:24px;
+}
+.md-alerts-card h2{ font-family:'Bebas Neue',sans-serif; letter-spacing:2px; font-size:24px; margin-bottom:4px; }
+.md-alerts-card .sub{ color:var(--text-dim); font-size:11px; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:18px; }
+.md-alerts-list{ display:flex; flex-direction:column; gap:8px; margin-bottom:20px; }
+.md-alerts-rule{
+  background:var(--bg); border:1px solid var(--border);
+  padding:10px 12px; display:flex; justify-content:space-between; align-items:center; gap:12px;
+  font-size:12px;
+}
+.md-alerts-rule .meta{ flex:1; }
+.md-alerts-rule .meta .ticker{ color:var(--text-bright); font-weight:600; letter-spacing:1px; }
+.md-alerts-rule .meta .cond{ color:var(--text-dim); font-size:11px; margin-top:2px; }
+.md-alerts-rule .meta .last{ color:var(--text-dim); font-size:10px; margin-top:2px; }
+.md-alerts-rule .ctrl{ display:flex; gap:6px; }
+.md-alerts-rule button{
+  background:transparent; border:1px solid var(--border-bright); color:var(--text-dim);
+  padding:4px 8px; cursor:pointer; font-size:10px; letter-spacing:1px; text-transform:uppercase;
+}
+.md-alerts-rule button:hover{ color:var(--text-bright); border-color:var(--accent); }
+.md-alerts-rule.disabled .ticker{ color:var(--text-dim); }
+.md-alerts-empty{ color:var(--text-dim); font-size:12px; text-align:center; padding:20px; }
+.md-alerts-form{ display:grid; grid-template-columns:1.4fr 1fr 1fr 1.2fr auto; gap:6px; margin-bottom:8px; }
+.md-alerts-form input, .md-alerts-form select{
+  background:var(--bg); border:1px solid var(--border-bright);
+  color:var(--text-bright); padding:7px 8px; font-family:inherit; font-size:12px;
+}
+.md-alerts-form button{
+  background:var(--accent); color:var(--bg); border:none; padding:7px 12px;
+  font-size:11px; font-weight:600; letter-spacing:1px; text-transform:uppercase; cursor:pointer;
+}
+.md-alerts-actions{ display:flex; justify-content:space-between; align-items:center; margin-top:14px; padding-top:14px; border-top:1px solid var(--border); }
+.md-alerts-perm{ font-size:11px; color:var(--text-dim); }
+.md-alerts-close{
+  background:transparent; border:1px solid var(--border-bright); color:var(--text);
+  padding:6px 14px; cursor:pointer; font-size:11px; letter-spacing:1.5px; text-transform:uppercase;
+}
+@media (max-width: 640px){
+  .md-alerts-form{ grid-template-columns:1fr 1fr; }
+  .md-alerts-form button{ grid-column:1 / -1; }
+}
+
+/* iOS Safari notch / safe-area awareness */
+@supports (padding: env(safe-area-inset-top)) {
+  .wrap{ padding-left:max(14px, env(safe-area-inset-left));
+         padding-right:max(14px, env(safe-area-inset-right));
+         padding-bottom:max(28px, env(safe-area-inset-bottom)); }
+}
+
 </style>
 </head>
 <body>
+
+<!-- JOURNAL UI (floating button + modal) ─────────────────────────────────── -->
+<button id="mdJournalFab" class="md-journal-fab" title="Trade Journal" aria-label="Trade Journal">
+  <span>📓</span>
+</button>
+
+<div id="mdJournalModal" class="md-alerts-modal" role="dialog" aria-modal="true" aria-labelledby="mdJournalTitle">
+  <div class="md-alerts-card md-journal-card">
+    <h2 id="mdJournalTitle">Trade Journal</h2>
+    <div class="sub">Capture the WHY at the moment of decision · stored in browser</div>
+
+    <form id="mdJournalForm" class="md-journal-form">
+      <input id="mdJournalTicker" type="text" placeholder="Ticker (e.g. BTC-USD)" required>
+      <select id="mdJournalDirection">
+        <option value="long">Long</option>
+        <option value="short">Short</option>
+        <option value="watch">Watch</option>
+      </select>
+      <select id="mdJournalConviction" title="Conviction (1=low, 5=high)">
+        <option value="3">Conviction · 3</option>
+        <option value="1">Conviction · 1</option>
+        <option value="2">Conviction · 2</option>
+        <option value="4">Conviction · 4</option>
+        <option value="5">Conviction · 5</option>
+      </select>
+      <input id="mdJournalEntry" type="number" step="any" placeholder="Entry price (opt)">
+      <input id="mdJournalTarget" type="number" step="any" placeholder="Target (opt)">
+      <input id="mdJournalStop" type="number" step="any" placeholder="Stop (opt)">
+      <textarea id="mdJournalThesis" placeholder="Thesis — what's the setup, what would invalidate it, what's the expected timeline" required></textarea>
+      <button type="submit">Add entry</button>
+    </form>
+
+    <div id="mdJournalList" class="md-journal-list"></div>
+
+    <div class="md-alerts-actions">
+      <span class="md-alerts-perm" id="mdJournalCount"></span>
+      <button type="button" class="md-alerts-close" id="mdJournalClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ALERTS UI (floating button + modal) ────────────────────────────────── -->
+<button id="mdAlertsFab" class="md-alerts-fab" title="Alerts" aria-label="Alerts">
+  <span>🔔</span>
+  <span class="badge" id="mdAlertsBadge" style="display:none;">0</span>
+</button>
+
+<div id="mdAlertsModal" class="md-alerts-modal" role="dialog" aria-modal="true" aria-labelledby="mdAlertsTitle">
+  <div class="md-alerts-card">
+    <h2 id="mdAlertsTitle">Alerts</h2>
+    <div class="sub">Threshold crossings · browser notifications · checks every 60s</div>
+
+    <div id="mdAlertsList" class="md-alerts-list"></div>
+
+    <form id="mdAlertsForm" class="md-alerts-form">
+      <input id="mdAlertTicker" type="text" placeholder="Ticker (e.g. BTC-USD)" required>
+      <select id="mdAlertCondition">
+        <option value="gt">crosses above</option>
+        <option value="lt">crosses below</option>
+        <option value="pct_up">+% over 1hr</option>
+        <option value="pct_down">−% over 1hr</option>
+      </select>
+      <input id="mdAlertThreshold" type="number" step="any" placeholder="Value" required>
+      <select id="mdAlertSource">
+        <option value="finnhub">Finnhub</option>
+        <option value="yahoo">Yahoo</option>
+      </select>
+      <button type="submit">Add</button>
+    </form>
+
+    <div class="md-alerts-actions">
+      <span class="md-alerts-perm" id="mdAlertsPerm"></span>
+      <button type="button" class="md-alerts-close" id="mdAlertsClose">Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="wrap">
 
 <!-- VIBE BAR — instant read at top -->
@@ -3581,6 +3842,463 @@ async function tcLoad() {
 
 window.addEventListener('resize',()=>{ tcSyncSizes(); tcDraw(); tcInitOverlay(); });
 setTimeout(tcLoad, 300);
+
+// ── ALERTS ──────────────────────────────────────────────────────────────
+// Threshold-crossing alerts via the browser Notification API.
+// Self-contained: rules in localStorage, polled every 60s through the
+// existing claude-proxy (so all keys stay server-side).
+//
+// Limitations:
+//   - Only fires when a tab is open. True background push would need
+//     VAPID keys + a server, which we're explicitly avoiding here.
+//   - Polling is per unique ticker (not per rule), so 5 rules on BTC-USD
+//     = 1 fetch/minute. Won't blow up the proxy rate limit.
+const mdAlerts = (() => {
+  const KEY = 'md_alerts_v1';
+  const POLL_MS = 60_000;
+  const PCT_WINDOW_MS = 60 * 60 * 1000; // 1hr lookback for pct rules
+
+  // ── Storage ─────────────────────────────────────────────────────────────
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '[]'); }
+    catch { return []; }
+  }
+  function save(rules) {
+    localStorage.setItem(KEY, JSON.stringify(rules));
+  }
+  function uid() {
+    return 'r_' + Math.random().toString(36).slice(2, 9);
+  }
+
+  // ── Notification permission ─────────────────────────────────────────────
+  async function ensurePermission() {
+    if (!('Notification' in window)) return 'unsupported';
+    if (Notification.permission === 'granted') return 'granted';
+    if (Notification.permission === 'denied') return 'denied';
+    try { return await Notification.requestPermission(); }
+    catch { return 'denied'; }
+  }
+  function fire(rule, currentValue) {
+    const dir = rule.condition.startsWith('pct') ? '%' : '';
+    const title = `${rule.ticker} alert`;
+    const body = `${rule.ticker} ${conditionLabel(rule.condition)} ${rule.threshold}${dir} (now ${currentValue})`;
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try { new Notification(title, { body, tag: rule.id, renotify: true }); }
+      catch (e) { console.warn('[alerts] notify failed', e); }
+    }
+    // In-page toast as fallback
+    try {
+      const t = document.createElement('div');
+      t.style.cssText = 'position:fixed;top:20px;right:20px;background:var(--surface);border:1px solid var(--red);padding:12px 16px;z-index:9200;font-size:13px;max-width:340px;';
+      t.innerHTML = '<div style="color:var(--red);font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">Alert</div>' +
+        '<div style="color:var(--text-bright);">' + escapeHtml(title) + '</div>' +
+        '<div style="color:var(--text-dim);font-size:11px;margin-top:4px;">' + escapeHtml(body) + '</div>';
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 8000);
+    } catch {}
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function conditionLabel(c) {
+    return ({ gt:'crossed above', lt:'crossed below', pct_up:'rose by', pct_down:'dropped by' })[c] || c;
+  }
+
+  // ── Price fetching (via existing proxy types) ───────────────────────────
+  async function fetchPrice(ticker, source) {
+    try {
+      if (source === 'finnhub') {
+        const r = await fetch('/.netlify/functions/claude-proxy', {
+          method: 'POST', headers: PROXY_HEADERS,
+          body: JSON.stringify({ type: 'finnhub', path: 'quote', params: { symbol: ticker } }),
+        });
+        if (!r.ok) return null;
+        const d = await r.json();
+        return (d && d.c) ? Number(d.c) : null;
+      }
+      // Yahoo path
+      const r = await fetch('/.netlify/functions/claude-proxy', {
+        method: 'POST', headers: PROXY_HEADERS,
+        body: JSON.stringify({ type: 'yahoo', ticker }),
+      });
+      if (!r.ok) return null;
+      const d = await r.json();
+      return (d && d.price) ? Number(d.price) : null;
+    } catch { return null; }
+  }
+
+  // ── Rule evaluation ─────────────────────────────────────────────────────
+  function shouldFire(rule, prevValue, currentValue) {
+    if (currentValue == null) return false;
+    if (rule.condition === 'gt') {
+      // Fire on transition from below-or-equal to above
+      return prevValue != null && prevValue <= rule.threshold && currentValue > rule.threshold;
+    }
+    if (rule.condition === 'lt') {
+      return prevValue != null && prevValue >= rule.threshold && currentValue < rule.threshold;
+    }
+    if (rule.condition === 'pct_up' || rule.condition === 'pct_down') {
+      // Use rule.reference_value (anchor set when rule created or last fired)
+      const ref = rule.reference_value;
+      const refTs = rule.reference_at || 0;
+      if (!ref || (Date.now() - refTs) > PCT_WINDOW_MS) {
+        // Reset window — set anchor and skip this evaluation
+        rule.reference_value = currentValue;
+        rule.reference_at = Date.now();
+        return false;
+      }
+      const pct = ((currentValue - ref) / ref) * 100;
+      if (rule.condition === 'pct_up' && pct >= rule.threshold) return true;
+      if (rule.condition === 'pct_down' && pct <= -Math.abs(rule.threshold)) return true;
+    }
+    return false;
+  }
+
+  // ── Polling tick ────────────────────────────────────────────────────────
+  async function tick() {
+    const rules = load().filter(r => r.enabled !== false);
+    if (rules.length === 0) return;
+    // Group by ticker+source so we fetch once even if multiple rules share it
+    const groups = new Map();
+    for (const r of rules) {
+      const key = `${r.source || 'finnhub'}::${r.ticker}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(r);
+    }
+    const all = load(); // re-read for save
+    for (const [key, rs] of groups) {
+      const [source, ticker] = key.split('::');
+      const price = await fetchPrice(ticker, source);
+      if (price == null) continue;
+      for (const r of rs) {
+        const prev = r.last_value;
+        const fireNow = shouldFire(r, prev, price);
+        const idx = all.findIndex(x => x.id === r.id);
+        if (idx === -1) continue;
+        all[idx].last_value = price;
+        all[idx].last_check_at = Date.now();
+        if (r.reference_value && !all[idx].reference_value) {
+          all[idx].reference_value = r.reference_value;
+          all[idx].reference_at = r.reference_at;
+        }
+        if (fireNow) {
+          fire(all[idx], price);
+          all[idx].last_fired_at = Date.now();
+          // For threshold rules in 'once' mode, disable after first fire
+          if (all[idx].fire_mode === 'once') all[idx].enabled = false;
+          // For pct rules, reset reference so we don't repeat-fire on the same window
+          if (r.condition.startsWith('pct')) {
+            all[idx].reference_value = price;
+            all[idx].reference_at = Date.now();
+          }
+        }
+      }
+    }
+    save(all);
+    render();
+  }
+
+  // ── UI ──────────────────────────────────────────────────────────────────
+  function render() {
+    const rules = load();
+    const list = document.getElementById('mdAlertsList');
+    const badge = document.getElementById('mdAlertsBadge');
+    const fab = document.getElementById('mdAlertsFab');
+    if (!list) return;
+    const active = rules.filter(r => r.enabled !== false);
+    if (badge) {
+      if (active.length > 0) { badge.style.display = ''; badge.textContent = active.length; }
+      else                   { badge.style.display = 'none'; }
+    }
+    // Pulse the FAB if any rule fired in the last 5 minutes
+    const recent = rules.some(r => r.last_fired_at && (Date.now() - r.last_fired_at) < 5 * 60 * 1000);
+    if (fab) fab.classList.toggle('has-alert', recent);
+
+    if (rules.length === 0) {
+      list.innerHTML = '<div class="md-alerts-empty">No alerts yet. Add one below.</div>';
+      return;
+    }
+    list.innerHTML = rules.map(r => {
+      const dir = r.condition.startsWith('pct') ? '%' : '';
+      const lastVal = r.last_value != null ? `last ${r.last_value}` : 'no data yet';
+      const lastFired = r.last_fired_at
+        ? `fired ${formatAgo(r.last_fired_at)}`
+        : 'never fired';
+      return `<div class="md-alerts-rule${r.enabled === false ? ' disabled' : ''}">
+        <div class="meta">
+          <div class="ticker">${escapeHtml(r.ticker)} <span style="color:var(--text-dim);font-weight:400;">via ${escapeHtml(r.source || 'finnhub')}</span></div>
+          <div class="cond">${conditionLabel(r.condition)} ${escapeHtml(String(r.threshold))}${dir}</div>
+          <div class="last">${lastVal} · ${lastFired}${r.enabled === false ? ' · disabled' : ''}</div>
+        </div>
+        <div class="ctrl">
+          <button data-act="toggle" data-id="${r.id}">${r.enabled === false ? 'Enable' : 'Disable'}</button>
+          <button data-act="delete" data-id="${r.id}">Delete</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function formatAgo(ts) {
+    const s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 60) return s + 's ago';
+    const m = Math.floor(s / 60);
+    if (m < 60) return m + 'm ago';
+    const h = Math.floor(m / 60);
+    if (h < 24) return h + 'h ago';
+    return Math.floor(h / 24) + 'd ago';
+  }
+
+  function bindUI() {
+    const fab = document.getElementById('mdAlertsFab');
+    const modal = document.getElementById('mdAlertsModal');
+    const closeBtn = document.getElementById('mdAlertsClose');
+    const form = document.getElementById('mdAlertsForm');
+    const list = document.getElementById('mdAlertsList');
+    const permEl = document.getElementById('mdAlertsPerm');
+    if (!fab || !modal) return;
+
+    function refreshPermLabel() {
+      const p = (typeof Notification !== 'undefined') ? Notification.permission : 'unsupported';
+      const map = { granted: '✓ Notifications enabled', denied: '✗ Notifications blocked — enable in browser settings', default: 'Click "Enable" to allow notifications', unsupported: '✗ Notifications not supported' };
+      permEl.textContent = map[p] || p;
+    }
+
+    fab.addEventListener('click', async () => {
+      modal.classList.add('open');
+      render();
+      refreshPermLabel();
+      if ('Notification' in window && Notification.permission === 'default') {
+        await ensurePermission();
+        refreshPermLabel();
+      }
+    });
+    closeBtn.addEventListener('click', () => modal.classList.remove('open'));
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const ticker = document.getElementById('mdAlertTicker').value.trim().toUpperCase();
+      const condition = document.getElementById('mdAlertCondition').value;
+      const threshold = Number(document.getElementById('mdAlertThreshold').value);
+      const source = document.getElementById('mdAlertSource').value;
+      if (!ticker || !Number.isFinite(threshold)) return;
+      const rules = load();
+      rules.push({
+        id: uid(),
+        ticker,
+        source,
+        condition,
+        threshold,
+        fire_mode: condition.startsWith('pct') ? 'every' : 'once',
+        enabled: true,
+        created_at: Date.now(),
+        last_value: null,
+        last_fired_at: null,
+      });
+      save(rules);
+      form.reset();
+      render();
+    });
+
+    list.addEventListener('click', (e) => {
+      const t = e.target.closest('button[data-act]');
+      if (!t) return;
+      const id = t.getAttribute('data-id');
+      const act = t.getAttribute('data-act');
+      const rules = load();
+      const idx = rules.findIndex(r => r.id === id);
+      if (idx === -1) return;
+      if (act === 'delete') rules.splice(idx, 1);
+      else if (act === 'toggle') rules[idx].enabled = rules[idx].enabled === false;
+      save(rules);
+      render();
+    });
+  }
+
+  // ── Init ────────────────────────────────────────────────────────────────
+  function init() {
+    bindUI();
+    render();
+    // First tick after 5s (let the rest of the page finish loading first),
+    // then every POLL_MS.
+    setTimeout(tick, 5000);
+    setInterval(tick, POLL_MS);
+  }
+  return { init, tick };
+})();
+mdAlerts.init();
+
+// ── TRADE JOURNAL ───────────────────────────────────────────────────────
+// Self-contained text journaling for capturing the WHY of a trade idea
+// at the moment of decision. Stored in localStorage. No backend.
+//
+// Statuses: open → won / lost / closed. Status is set manually via the
+// row buttons; pnl is prompted on close. Direction is informational only.
+const mdJournal = (() => {
+  const KEY = 'md_journal_v1';
+
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '[]'); }
+    catch { return []; }
+  }
+  function save(entries) {
+    localStorage.setItem(KEY, JSON.stringify(entries));
+  }
+  function uid() { return 'j_' + Math.random().toString(36).slice(2, 9); }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function fmtAgo(ts) {
+    const s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 60) return s + 's';
+    const m = Math.floor(s / 60); if (m < 60) return m + 'm';
+    const h = Math.floor(m / 60); if (h < 24) return h + 'h';
+    const d = Math.floor(h / 24); if (d < 30) return d + 'd';
+    return Math.floor(d / 30) + 'mo';
+  }
+
+  function statusBadge(status) {
+    const labels = { open:'OPEN', won:'WON', lost:'LOST', closed:'CLOSED' };
+    return labels[status] || status;
+  }
+
+  function render() {
+    const entries = load().sort((a, b) => b.ts - a.ts);
+    const list = document.getElementById('mdJournalList');
+    const count = document.getElementById('mdJournalCount');
+    if (!list) return;
+    if (count) {
+      const open = entries.filter(e => e.status === 'open').length;
+      count.textContent = `${entries.length} total · ${open} open`;
+    }
+    if (entries.length === 0) {
+      list.innerHTML = '<div class="md-journal-empty">No entries yet. Add your first trade idea below.</div>';
+      return;
+    }
+    list.innerHTML = entries.map(e => {
+      const dirLabel = ({long:'LONG', short:'SHORT', watch:'WATCH'})[e.direction] || e.direction;
+      const dirCls = `dir-${e.direction}`;
+      const levels = [];
+      if (e.entry_price != null) levels.push(`<span><strong>Entry</strong>${escapeHtml(String(e.entry_price))}</span>`);
+      if (e.target != null)      levels.push(`<span><strong>Target</strong>${escapeHtml(String(e.target))}</span>`);
+      if (e.stop != null)        levels.push(`<span><strong>Stop</strong>${escapeHtml(String(e.stop))}</span>`);
+      if (e.pnl != null)         levels.push(`<span><strong>PnL</strong>${escapeHtml(String(e.pnl))}</span>`);
+      const ctrl = e.status === 'open'
+        ? `<button data-act="won" data-id="${e.id}">Won</button>
+           <button data-act="lost" data-id="${e.id}">Lost</button>
+           <button data-act="closed" data-id="${e.id}">Closed</button>
+           <button data-act="delete" data-id="${e.id}">Delete</button>`
+        : `<button data-act="reopen" data-id="${e.id}">Reopen</button>
+           <button data-act="delete" data-id="${e.id}">Delete</button>`;
+      return `<div class="md-journal-entry ${escapeHtml(e.status)}">
+        <div class="head">
+          <div class="ticker">
+            ${escapeHtml(e.ticker)}
+            <span class="${dirCls}">${dirLabel}</span>
+            <span class="conviction">conv ${escapeHtml(String(e.conviction))}/5</span>
+          </div>
+          <div class="meta">${statusBadge(e.status)} · ${fmtAgo(e.ts)} ago</div>
+        </div>
+        <div class="thesis">${escapeHtml(e.thesis)}</div>
+        ${levels.length ? `<div class="levels">${levels.join('')}</div>` : ''}
+        <div class="ctrl">${ctrl}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function bindUI() {
+    const fab = document.getElementById('mdJournalFab');
+    const modal = document.getElementById('mdJournalModal');
+    const closeBtn = document.getElementById('mdJournalClose');
+    const form = document.getElementById('mdJournalForm');
+    const list = document.getElementById('mdJournalList');
+    if (!fab || !modal) return;
+
+    fab.addEventListener('click', () => {
+      modal.classList.add('open');
+      // Auto-fill ticker from currently-loaded chart if available
+      const tickerInput = document.getElementById('mdJournalTicker');
+      if (tickerInput && !tickerInput.value && typeof TC !== 'undefined' && TC && TC.symbol) {
+        tickerInput.value = TC.symbol;
+      }
+      render();
+    });
+    closeBtn.addEventListener('click', () => modal.classList.remove('open'));
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const ticker = document.getElementById('mdJournalTicker').value.trim().toUpperCase();
+      const direction = document.getElementById('mdJournalDirection').value;
+      const conviction = Number(document.getElementById('mdJournalConviction').value);
+      const thesis = document.getElementById('mdJournalThesis').value.trim();
+      const entry_price = parseOptional('mdJournalEntry');
+      const target = parseOptional('mdJournalTarget');
+      const stop = parseOptional('mdJournalStop');
+      if (!ticker || !thesis) return;
+      const entries = load();
+      entries.push({
+        id: uid(),
+        ts: Date.now(),
+        ticker, direction, conviction, thesis,
+        entry_price, target, stop,
+        status: 'open',
+        closed_at: null,
+        pnl: null,
+      });
+      save(entries);
+      // Reset form but preserve ticker for quick follow-ups
+      const t = document.getElementById('mdJournalTicker').value;
+      form.reset();
+      document.getElementById('mdJournalTicker').value = t;
+      render();
+    });
+
+    list.addEventListener('click', (e) => {
+      const t = e.target.closest('button[data-act]');
+      if (!t) return;
+      const id = t.getAttribute('data-id');
+      const act = t.getAttribute('data-act');
+      const entries = load();
+      const idx = entries.findIndex(x => x.id === id);
+      if (idx === -1) return;
+      if (act === 'delete') {
+        if (!confirm('Delete this journal entry?')) return;
+        entries.splice(idx, 1);
+      } else if (act === 'reopen') {
+        entries[idx].status = 'open';
+        entries[idx].closed_at = null;
+        entries[idx].pnl = null;
+      } else if (act === 'won' || act === 'lost' || act === 'closed') {
+        const pnlIn = prompt('PnL (optional, leave blank to skip):');
+        const pnl = pnlIn != null && pnlIn.trim() !== '' && Number.isFinite(Number(pnlIn)) ? Number(pnlIn) : null;
+        entries[idx].status = act;
+        entries[idx].closed_at = Date.now();
+        entries[idx].pnl = pnl;
+      }
+      save(entries);
+      render();
+    });
+  }
+
+  function parseOptional(id) {
+    const el = document.getElementById(id);
+    if (!el || !el.value.trim()) return null;
+    const n = Number(el.value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function init() {
+    bindUI();
+    render();
+  }
+  return { init };
+})();
+mdJournal.init();
 
 // ── Service Worker registration ─────────────────────────────────────────
 // Caches app shell + Yahoo/FRED/Finnhub/etc. for instant load on revisit.
