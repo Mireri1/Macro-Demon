@@ -13,7 +13,7 @@
 //   - Bump CACHE_VERSION when you ship a new index.html or change the
 //     proxy contract. Old caches are deleted on activation.
 
-const CACHE_VERSION = 'md-v2';
+const CACHE_VERSION = 'md-v3';
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const DATA_CACHE = `${CACHE_VERSION}-data`;
 

@@ -2120,7 +2120,9 @@ ${storyList}`;
   const raw = await callClaude({ type: 'news_enrich', prompt, max_tokens: 1000 });
   if (!raw) return; // silently fail — static content already shown
   try {
-    const insights = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    const arr = raw.replace(/```json|```/g, '').match(/\[[\s\S]*\]/);
+    if (!arr) return;
+    const insights = JSON.parse(arr[0]);
     insights.forEach(({ id, insight }) => {
       const el = document.getElementById('nb-' + id);
       if (el && insight) {
@@ -2279,7 +2281,9 @@ ${items}`;
   const raw = await callClaude({ type: 'news_classify', prompt, max_tokens: 600 });
   if (!raw) return;
   try {
-    const classifications = JSON.parse(raw.replace(/```json|```/g,'').trim());
+    const arr = raw.replace(/```json|```/g,'').match(/\[[\s\S]*\]/);
+    if (!arr) return;
+    const classifications = JSON.parse(arr[0]);
     const impactClass = { bull:'impact-bull', bear:'impact-bear', neutral:'impact-neutral', watch:'impact-watch' };
     classifications.forEach(({ id, impact, label }) => {
       const el = document.getElementById('ni-' + id);
@@ -2783,7 +2787,12 @@ Return exactly 8 items. Real headlines only, no fabrication.`;
     const d = await res.json();
     if (!d.text) throw new Error('No response');
 
-    const raw = JSON.parse(d.text.replace(/```json|```/g, '').trim());
+    // Claude often prepends "Based on my search..." before the JSON.
+    // Extract the first JSON array we find rather than parsing the whole string.
+    const cleaned = d.text.replace(/```json|```/g, '');
+    const arrayMatch = cleaned.match(/\[\s*\{[\s\S]*\}\s*\]/);
+    if (!arrayMatch) throw new Error('No JSON array in response');
+    const raw = JSON.parse(arrayMatch[0]);
     if (!Array.isArray(raw) || !raw.length) throw new Error('Invalid response');
     const stories = raw.map(s => ({
       title:       s.title || s.headline || '',
